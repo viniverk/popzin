@@ -35,3 +35,14 @@ Pronto: dali em diante é só entrar com usuário e senha.
 - Depois de salvar no painel, o site leva ~1 minuto para atualizar (tempo do GitHub Pages).
 - As imagens são redimensionadas para no máximo 1000px e convertidas para WebP antes do envio.
 - Domínio próprio (ex.: loja.cliente3d.com.br): Settings → Pages → Custom domain.
+
+## Banco de dados (Supabase) — atualização instantânea
+Com o Supabase configurado, produtos, configurações e artes ficam no banco: salvou no painel, já aparece no site.
+1. Crie o projeto em supabase.com (região São Paulo).
+2. SQL Editor → cole `supabase-setup.sql` → troque o e-mail no final → Run.
+3. Authentication → Users → **Add user** (seu e-mail + senha, marque *Auto Confirm*).
+4. Authentication → Sign In / Providers → desligue **Allow new users to sign up**.
+5. Preencha `config.js` com a Project URL e a chave *publishable* (ou *anon*).
+6. Entre no painel com e-mail e senha e clique em **Importar agora** (traz os produtos atuais).
+
+Sem `config.js` preenchido, o site e o painel continuam usando `produtos.json`/`loja.json` do GitHub.

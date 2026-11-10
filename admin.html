@@ -101,7 +101,7 @@
 <form id="telaLogin" class="caixa-login oculto">
   <div class="logo"><img src="img/marca/logo-texto.webp" alt="PopZin"></div>
   <div class="sub">Painel do lojista</div>
-  <label>Usuário<input id="lUser" autocomplete="username" required></label>
+  <label><span id="lUserLbl">Usuário</span><input id="lUser" autocomplete="username" required></label>
   <label>Senha<input id="lPass" type="password" autocomplete="current-password" required></label>
   <div id="lMsg" class="msg oculto"></div>
   <button class="btn" id="btnLogin" type="submit">Entrar</button>
@@ -130,7 +130,8 @@
         <input id="filtro" type="search" placeholder="🔍 Buscar produto...">
         <button class="btn" id="btnNovo">+ Novo produto</button>
       </div>
-      <div class="ajuda" style="margin-bottom:10px">Depois de salvar, o site leva cerca de 1 minuto para atualizar no GitHub Pages.</div>
+      <div class="ajuda" id="avisoTempo" style="margin-bottom:10px">Depois de salvar, o site leva cerca de 1 minuto para atualizar no GitHub Pages.</div>
+      <div id="importar" class="cartao oculto" style="margin-bottom:14px;max-width:none"></div>
       <table>
         <thead><tr><th></th><th>Produto</th><th class="col-colecao">Coleção</th><th>Preço</th><th class="col-estoque">Estoque</th><th></th></tr></thead>
         <tbody id="tabela"></tbody>
@@ -210,6 +211,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="config.js?v=1"></script>
 <script>
 /* =========================================================
    Painel PopZin — salva direto no repositório via API do GitHub.
@@ -302,12 +304,73 @@ async function apagar(caminho, mensagem){
 async function lerJSON(caminho, padrao){ const f = await gh(caminho); return f ? JSON.parse(b64utf8(f.content)) : padrao; }
 const gravarJSON = (caminho, obj, mensagem) => gravar(caminho, utf8b64(JSON.stringify(obj, null, 2)), mensagem);
 
+/* ---------- Supabase (quando config.js estiver preenchido) ----------
+   Produtos/configurações ficam no banco e as artes no Storage: salvou, apareceu no site. */
+const SB = window.POPZIN_SUPABASE || {};
+const modoSB = !!(SB.url && SB.chave);
+const SB_URL = (SB.url||"").replace(/\/+$/,"");
+let sbSessao = null;   // {access_token, refresh_token, expires_at, email}
+const lerSessaoSB = () => { try{ return JSON.parse(localStorage.getItem("popzin_sb")) }catch(e){ return null } };
+const gravarSessaoSB = s => { sbSessao = s; try{ s ? localStorage.setItem("popzin_sb", JSON.stringify(s)) : localStorage.removeItem("popzin_sb"); }catch(e){} };
+
+async function sbAuth(grant, corpo){
+  const r = await fetch(`${SB_URL}/auth/v1/token?grant_type=${grant}`, {method:"POST", headers:{apikey:SB.chave, "Content-Type":"application/json"}, body:JSON.stringify(corpo)});
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error_description || j.msg || j.message || `Erro ${r.status}`);
+  gravarSessaoSB({access_token:j.access_token, refresh_token:j.refresh_token, expires_at:Date.now()+ (j.expires_in||3600)*1000, email:j.user?.email||sbSessao?.email||""});
+  return sbSessao;
+}
+async function sbToken(){
+  if(!sbSessao) throw new Error("Sessão expirada. Entre de novo.");
+  if(Date.now() > sbSessao.expires_at - 60000) await sbAuth("refresh_token", {refresh_token: sbSessao.refresh_token});
+  return sbSessao.access_token;
+}
+async function sb(caminho, opts={}){
+  const headers = {apikey:SB.chave, Authorization:`Bearer ${await sbToken()}`, ...(opts.headers||{})};
+  const r = await fetch(`${SB_URL}${caminho}`, {...opts, headers});
+  if(r.status===401){ gravarSessaoSB(null); throw new Error("Sessão expirada. Entre de novo."); }
+  if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(`Supabase ${r.status}: ${e.message||e.error||e.msg||"erro"}`); }
+  const t = await r.text(); return t ? JSON.parse(t) : null;
+}
+const jsonH = extra => ({"Content-Type":"application/json", ...extra});
+const urlPublica = caminho => `${SB_URL}/storage/v1/object/public/artes/${caminho}`;
+
+/* ---------- camada de dados: mesma interface para Supabase e GitHub ---------- */
+const PADRAO_LOJA = {loja:"PopZin", whatsapp:"", freteGratisAcima:120, descontoPix:0.05, fretes:{"Sul / Sudeste / Centro-Oeste":15,"Norte / Nordeste":30}, linkGrupoVip:"#", instagram:"#", precoChaveiro:1};
+const BD = modoSB ? {
+  async lerProdutos(){ return (await sb("/rest/v1/produtos?select=id,dados&order=id")).map(l => ({...l.dados, id:l.id})); },
+  async salvarProduto(p){ await sb("/rest/v1/produtos", {method:"POST", headers:jsonH({Prefer:"resolution=merge-duplicates,return=minimal"}), body:JSON.stringify({id:p.id, dados:p, atualizado:new Date().toISOString()})}); },
+  async salvarVarios(lista){ if(lista.length) await sb("/rest/v1/produtos", {method:"POST", headers:jsonH({Prefer:"resolution=merge-duplicates,return=minimal"}), body:JSON.stringify(lista.map(p=>({id:+p.id, dados:{...p, id:+p.id}})))}); },
+  async excluirProduto(p){ await sb(`/rest/v1/produtos?id=eq.${+p.id}`, {method:"DELETE"}); },
+  async lerLoja(){ const l = await sb("/rest/v1/loja?select=dados&id=eq.1"); return l?.[0]?.dados || null; },
+  async salvarLoja(obj){ await sb("/rest/v1/loja", {method:"POST", headers:jsonH({Prefer:"resolution=merge-duplicates,return=minimal"}), body:JSON.stringify({id:1, dados:obj, atualizado:new Date().toISOString()})}); },
+  async enviarFoto(blob, nome){ await sb(`/storage/v1/object/artes/${nome}`, {method:"POST", headers:{"Content-Type":blob.type, "cache-control":"31536000"}, body:blob}); return urlPublica(nome); },
+  async apagarFoto(foto){ const pre = `${SB_URL}/storage/v1/object/public/artes/`; if(foto?.startsWith(pre)) await sb(`/storage/v1/object/artes/${foto.slice(pre.length)}`, {method:"DELETE"}); },
+  aviso: "✅ Salvou, já está no site."
+} : {
+  lerProdutos: () => lerJSON("produtos.json", []),
+  async salvarProduto(p){ const atual = await lerJSON("produtos.json", []); const i = atual.findIndex(x => x.id == p.id); if(i>=0) atual[i]=p; else atual.push(p); await gravarJSON("produtos.json", atual, `Salva produto: ${p.nome}`); },
+  async excluirProduto(p){ const atual = (await lerJSON("produtos.json", [])).filter(x => x.id != p.id); await gravarJSON("produtos.json", atual, `Remove produto: ${p.nome}`); },
+  lerLoja: () => lerJSON("loja.json", null),
+  salvarLoja: obj => gravarJSON("loja.json", obj, "Atualiza configurações da loja"),
+  async enviarFoto(blob, nome){ const caminho = `img/${nome}`; await gravar(caminho, await blobB64(blob), `Arte: ${nome}`); return caminho; },
+  async apagarFoto(foto){ if(foto?.startsWith("img/") && !foto.startsWith("img/marca/")) await apagar(foto, "Remove arte antiga"); },
+  aviso: "Salvo! O site atualiza em ~1 min ✅"
+};
+
 /* ---------- início: setup ou login ---------- */
 let cfgCripto = null;
 async function iniciar(){
   if(location.protocol === "http:" && !/^(localhost|127\.)/.test(location.hostname)){
     document.querySelectorAll(".caixa-login .sub").forEach(el => el.insertAdjacentHTML("afterend",
       `<div class="msg">⚠️ Conexão sem cadeado (http). O painel funciona, mas use só em rede confiável até o HTTPS do domínio ficar pronto. <a href="https://${location.host}${location.pathname}">Tentar https</a></div>`));
+  }
+  if(modoSB){
+    $("#lUserLbl").textContent = "E-mail"; $("#lUser").type = "email"; $("#lUser").autocomplete = "email";
+    $("#avisoTempo").textContent = "As alterações aparecem no site na hora (atualize a página da loja).";
+    sbSessao = lerSessaoSB();
+    if(sbSessao){ try{ await sbToken(); return entrarNoPainel(); }catch(e){ gravarSessaoSB(null); } }
+    mostrar("#telaLogin"); return;
   }
   try{
     const r = await fetch(ARQ_CONFIG + "?v=" + Date.now(), {cache:"no-store"});
@@ -347,6 +410,11 @@ $("#telaLogin").onsubmit = async e => {
   e.preventDefault();
   const el = $("#lMsg"), b = $("#btnLogin");
   b.disabled = true; msg(el,"Entrando...",true);
+  if(modoSB){
+    try{ await sbAuth("password", {email:$("#lUser").value.trim(), password:$("#lPass").value}); }
+    catch(err){ b.disabled=false; return msg(el, /invalid/i.test(err.message) ? "E-mail ou senha incorretos." : err.message); }
+    b.disabled = false; $("#lPass").value = ""; return entrarNoPainel();
+  }
   try{
     sessao = JSON.parse(await decifrar(cfgCripto, $("#lUser").value, $("#lPass").value));
   }catch(err){ b.disabled=false; await new Promise(r=>setTimeout(r,800)); return msg(el,"Usuário ou senha incorretos."); }
@@ -355,16 +423,21 @@ $("#telaLogin").onsubmit = async e => {
   entrarNoPainel();
 };
 
-$("#btnSair").onclick = () => { try{ sessionStorage.removeItem("popzin_sessao"); }catch(e){} sessao=null; location.reload(); };
+$("#btnSair").onclick = async () => {
+  if(modoSB){ try{ await fetch(`${SB_URL}/auth/v1/logout`, {method:"POST", headers:{apikey:SB.chave, Authorization:`Bearer ${sbSessao?.access_token}`}}); }catch(e){} gravarSessaoSB(null); }
+  try{ sessionStorage.removeItem("popzin_sessao"); }catch(e){} sessao=null; location.reload();
+};
 
 async function entrarNoPainel(){
   mostrar("#telaPainel");
   $("#tabela").innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--suave);padding:30px">Carregando...</td></tr>`;
   try{
-    produtos = await lerJSON("produtos.json", []);
-    loja = await lerJSON("loja.json", {loja:"PopZin", whatsapp:"", freteGratisAcima:120, descontoPix:0.05, fretes:{"Sul / Sudeste / Centro-Oeste":15,"Norte / Nordeste":30}, linkGrupoVip:"#", instagram:"#"});
+    produtos = await BD.lerProdutos();
+    loja = (await BD.lerLoja()) || {...PADRAO_LOJA};
     renderTabela(); preencherLoja();
+    if(modoSB && !produtos.length) mostrarImportar();
   }catch(e){
+    if(modoSB && /expirada/.test(e.message)){ toast(e.message, true); return mostrar("#telaLogin"); }
     if(/401|403/.test(e.message)){ toast("Token inválido ou expirado. Refaça a configuração.", true); try{ sessionStorage.removeItem("popzin_sessao"); }catch(_){} }
     else toast(e.message, true);
   }
@@ -455,20 +528,16 @@ $("#formProduto").onsubmit = async e => {
     const fotoAntiga = editando?.foto || "";
     if(novaFoto){
       b.textContent = "Enviando arte...";
-      const caminho = `img/${id}-${slug(p.nome)}-${Date.now().toString(36)}.${novaFoto.ext}`;
-      await gravar(caminho, await blobB64(novaFoto.blob), `Arte: ${p.nome}`);
-      p.foto = caminho;
+      p.foto = await BD.enviarFoto(novaFoto.blob, `${id}-${slug(p.nome)}-${Date.now().toString(36)}.${novaFoto.ext}`);
     } else if(removerFoto) p.foto = "";
     if(!p.de || p.de <= p.preco) p.de = 0;
 
     b.textContent = "Atualizando catálogo...";
-    const atual = await lerJSON("produtos.json", []);           // pega a versão mais nova antes de gravar
-    const i = atual.findIndex(x => x.id == id);
-    if(i >= 0) atual[i] = p; else atual.push(p);
-    await gravarJSON("produtos.json", atual, `${editando?"Edita":"Adiciona"} produto: ${p.nome}`);
-    produtos = atual;
-    if(fotoAntiga && fotoAntiga !== p.foto && fotoAntiga.startsWith("img/")) apagar(fotoAntiga, `Remove arte antiga: ${p.nome}`).catch(()=>{});
-    renderTabela(); fecharModal(); toast("Salvo! O site atualiza em ~1 min ✅");
+    await BD.salvarProduto(p);
+    const i = produtos.findIndex(x => x.id == id);
+    if(i >= 0) produtos[i] = p; else produtos.push(p);
+    if(fotoAntiga && fotoAntiga !== p.foto) BD.apagarFoto(fotoAntiga).catch(()=>{});
+    renderTabela(); fecharModal(); toast(BD.aviso);
   }catch(err){ toast(err.message, true); }
   b.disabled = false; b.textContent = "Salvar";
 };
@@ -479,13 +548,32 @@ $("#btnExcluir").onclick = async () => {
   if(b.dataset.confirmar !== "1"){ b.dataset.confirmar="1"; b.textContent="Clique de novo para confirmar"; setTimeout(()=>{ b.dataset.confirmar=""; b.textContent="Excluir"; }, 3000); return; }
   b.disabled = true;
   try{
-    const atual = (await lerJSON("produtos.json", [])).filter(x => x.id != editando.id);
-    await gravarJSON("produtos.json", atual, `Remove produto: ${editando.nome}`);
-    if(editando.foto?.startsWith("img/")) apagar(editando.foto, `Remove arte: ${editando.nome}`).catch(()=>{});
-    produtos = atual; renderTabela(); fecharModal(); toast("Produto excluído.");
+    await BD.excluirProduto(editando);
+    if(editando.foto) BD.apagarFoto(editando.foto).catch(()=>{});
+    produtos = produtos.filter(x => x.id != editando.id); renderTabela(); fecharModal(); toast("Produto excluído.");
   }catch(err){ toast(err.message, true); }
   b.disabled = false; b.dataset.confirmar=""; b.textContent="Excluir";
 };
+
+/* ---------- importação única: GitHub (produtos.json/loja.json) → Supabase ---------- */
+function mostrarImportar(){
+  const box = $("#importar"); box.classList.remove("oculto");
+  box.innerHTML = `<h3>📦 Trazer os produtos do site atual</h3>
+    <div class="ajuda">O banco de dados está vazio. Clique abaixo para copiar os produtos e as configurações que já estão no site (arquivos do GitHub) para o banco. As fotos atuais continuam funcionando.</div>
+    <button class="btn" id="btnImportar">Importar agora</button>`;
+  $("#btnImportar").onclick = async () => {
+    const b = $("#btnImportar"); b.disabled = true; b.textContent = "Importando...";
+    try{
+      const pegar = async arq => { const r = await fetch(arq + "?v=" + Date.now(), {cache:"no-store"}); return r.ok ? r.json() : null; };
+      const lista = (await pegar("produtos.json")) || [], lj = await pegar("loja.json");
+      await BD.salvarVarios(lista);
+      if(lj) await BD.salvarLoja({...PADRAO_LOJA, ...lj});
+      produtos = await BD.lerProdutos(); loja = (await BD.lerLoja()) || {...PADRAO_LOJA};
+      renderTabela(); preencherLoja(); box.classList.add("oculto");
+      toast(`Importados ${lista.length} produtos ✅`);
+    }catch(err){ toast(err.message, true); b.disabled = false; b.textContent = "Importar agora"; }
+  };
+}
 
 /* ---------- configurações da loja ---------- */
 function linhaFrete(nome="", valor=""){
@@ -509,7 +597,7 @@ $("#btnSalvarLoja").onclick = async () => {
   loja = { loja:$("#cLoja").value.trim()||"PopZin", whatsapp:$("#cWhats").value.replace(/\D/g,""), freteGratisAcima:+$("#cFreteGratis").value||0,
            descontoPix:(+$("#cPix").value||0)/100, fretes, linkGrupoVip:$("#cVip").value.trim()||"#", instagram:$("#cInsta").value.trim()||"#",
            faixaTitulo:$("#cFaixaTitulo").value.trim(), faixaSub:$("#cFaixaSub").value.trim(), faixaOcultar:$("#cFaixaOcultar").checked, precoChaveiro:+$("#cChav").value||0 };
-  try{ await gravarJSON("loja.json", loja, "Atualiza configurações da loja"); toast("Configurações salvas ✅"); }
+  try{ await BD.salvarLoja(loja); toast(modoSB ? "Configurações salvas — já valem no site ✅" : "Configurações salvas ✅"); }
   catch(err){ toast(err.message, true); }
   b.disabled = false;
 };
