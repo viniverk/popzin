@@ -1,8 +1,9 @@
-/* Conexão com o Supabase (banco de dados dos produtos).
-   Preencha com a Project URL e a chave publishable/anon do seu projeto.
-   Essas duas informações são públicas — NUNCA coloque aqui a chave secret/service_role.
+/* Conexão com o Firebase (banco de dados dos produtos).
+   Preencha com o apiKey e o projectId do app Web do seu projeto
+   (Firebase → Configurações do projeto → Seus apps → firebaseConfig).
+   Esses dados são públicos por natureza; quem protege o banco são as regras do Firestore.
    Deixando em branco, o site e o painel usam os arquivos produtos.json/loja.json do GitHub. */
-window.POPZIN_SUPABASE = {
-  url: "",
-  chave: ""
+window.POPZIN_FIREBASE = {
+  apiKey: "",
+  projectId: ""
 };

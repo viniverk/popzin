@@ -175,8 +175,14 @@
     <div class="foto-area">
       <div class="preview" id="preview">🐾</div>
       <div style="display:grid;gap:8px">
-        <label>Arte / foto do produto<input type="file" id="pFoto" accept="image/*"></label>
-        <div class="ajuda">A imagem é redimensionada (máx. 1000px) e comprimida antes de subir.</div>
+        <div id="fotoArquivo" style="display:grid;gap:8px">
+          <label>Arte / foto do produto<input type="file" id="pFoto" accept="image/*"></label>
+          <div class="ajuda">A imagem é redimensionada (máx. 1000px) e comprimida antes de subir.</div>
+        </div>
+        <div id="fotoLink" class="oculto" style="display:grid;gap:8px">
+          <label>Link da foto<input id="pFotoUrl" type="url" placeholder="https://i.imgur.com/abc123.jpg"></label>
+          <div class="ajuda">Envie a foto em <a href="https://imgur.com/upload" target="_blank" rel="noopener">imgur.com/upload</a>, clique com o botão direito na imagem → <b>Copiar endereço da imagem</b> e cole aqui. Link de página do Imgur também serve.</div>
+        </div>
         <button type="button" class="btn sec" id="btnTirarFoto">Remover foto</button>
       </div>
     </div>
@@ -304,48 +310,72 @@ async function apagar(caminho, mensagem){
 async function lerJSON(caminho, padrao){ const f = await gh(caminho); return f ? JSON.parse(b64utf8(f.content)) : padrao; }
 const gravarJSON = (caminho, obj, mensagem) => gravar(caminho, utf8b64(JSON.stringify(obj, null, 2)), mensagem);
 
-/* ---------- Supabase (quando config.js estiver preenchido) ----------
-   Produtos/configurações ficam no banco e as artes no Storage: salvou, apareceu no site. */
-const SB = window.POPZIN_SUPABASE || {};
-const modoSB = !!(SB.url && SB.chave);
-const SB_URL = (SB.url||"").replace(/\/+$/,"");
-let sbSessao = null;   // {access_token, refresh_token, expires_at, email}
-const lerSessaoSB = () => { try{ return JSON.parse(localStorage.getItem("popzin_sb")) }catch(e){ return null } };
-const gravarSessaoSB = s => { sbSessao = s; try{ s ? localStorage.setItem("popzin_sb", JSON.stringify(s)) : localStorage.removeItem("popzin_sb"); }catch(e){} };
-
-async function sbAuth(grant, corpo){
-  const r = await fetch(`${SB_URL}/auth/v1/token?grant_type=${grant}`, {method:"POST", headers:{apikey:SB.chave, "Content-Type":"application/json"}, body:JSON.stringify(corpo)});
+/* ---------- Firebase (quando config.js estiver preenchido) ----------
+   Produtos e configurações ficam no Firestore (salvou, apareceu no site).
+   Login: Firebase Authentication (e-mail/senha). Fotos: link de imagem (ex.: Imgur). */
+const FB = window.POPZIN_FIREBASE || {};
+const modoFB = !!(FB.apiKey && FB.projectId);
+const FS = `https://firestore.googleapis.com/v1/projects/${FB.projectId}/databases/(default)/documents`;
+let fbSessao = null;   // {idToken, refreshToken, expires_at, email}
+const lerSessaoFB = () => { try{ return JSON.parse(localStorage.getItem("popzin_fb")) }catch(e){ return null } };
+const gravarSessaoFB = s => { fbSessao = s; try{ s ? localStorage.setItem("popzin_fb", JSON.stringify(s)) : localStorage.removeItem("popzin_fb"); }catch(e){} };
+const ERROS_FB = {INVALID_LOGIN_CREDENTIALS:"E-mail ou senha incorretos.", INVALID_PASSWORD:"E-mail ou senha incorretos.", EMAIL_NOT_FOUND:"E-mail ou senha incorretos.",
+  USER_DISABLED:"Usuário desativado.", TOO_MANY_ATTEMPTS_TRY_LATER:"Muitas tentativas. Espere alguns minutos."};
+async function fbLogin(email, senha){
+  const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FB.apiKey}`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({email, password:senha, returnSecureToken:true})});
   const j = await r.json().catch(()=>({}));
-  if(!r.ok) throw new Error(j.error_description || j.msg || j.message || `Erro ${r.status}`);
-  gravarSessaoSB({access_token:j.access_token, refresh_token:j.refresh_token, expires_at:Date.now()+ (j.expires_in||3600)*1000, email:j.user?.email||sbSessao?.email||""});
-  return sbSessao;
+  if(!r.ok){ const c = (j.error?.message||"").split(" ")[0]; throw new Error(ERROS_FB[c] || c || `Erro ${r.status}`); }
+  gravarSessaoFB({idToken:j.idToken, refreshToken:j.refreshToken, expires_at:Date.now()+(+j.expiresIn||3600)*1000, email:j.email});
 }
-async function sbToken(){
-  if(!sbSessao) throw new Error("Sessão expirada. Entre de novo.");
-  if(Date.now() > sbSessao.expires_at - 60000) await sbAuth("refresh_token", {refresh_token: sbSessao.refresh_token});
-  return sbSessao.access_token;
+async function fbToken(){
+  if(!fbSessao) throw new Error("Sessão expirada. Entre de novo.");
+  if(Date.now() > fbSessao.expires_at - 60000){
+    const r = await fetch(`https://securetoken.googleapis.com/v1/token?key=${FB.apiKey}`, {method:"POST", headers:{"Content-Type":"application/x-www-form-urlencoded"}, body:`grant_type=refresh_token&refresh_token=${encodeURIComponent(fbSessao.refreshToken)}`});
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok){ gravarSessaoFB(null); throw new Error("Sessão expirada. Entre de novo."); }
+    gravarSessaoFB({...fbSessao, idToken:j.id_token, refreshToken:j.refresh_token, expires_at:Date.now()+(+j.expires_in||3600)*1000});
+  }
+  return fbSessao.idToken;
 }
-async function sb(caminho, opts={}){
-  const headers = {apikey:SB.chave, Authorization:`Bearer ${await sbToken()}`, ...(opts.headers||{})};
-  const r = await fetch(`${SB_URL}${caminho}`, {...opts, headers});
-  if(r.status===401){ gravarSessaoSB(null); throw new Error("Sessão expirada. Entre de novo."); }
-  if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(`Supabase ${r.status}: ${e.message||e.error||e.msg||"erro"}`); }
+async function fs(caminho, opts={}){
+  const r = await fetch(`${FS}/${caminho}`, {...opts, headers:{Authorization:`Bearer ${await fbToken()}`, ...(opts.body?{"Content-Type":"application/json"}:{}), ...(opts.headers||{})}});
+  if(r.status===404 && !opts.method) return null;
+  if(r.status===401){ gravarSessaoFB(null); throw new Error("Sessão expirada. Entre de novo."); }
+  if(r.status===403) throw new Error("Sem permissão no Firebase — confira as regras do Firestore (e-mail do administrador).");
+  if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(`Firebase ${r.status}: ${e.error?.message||"erro"}`); }
   const t = await r.text(); return t ? JSON.parse(t) : null;
 }
-const jsonH = extra => ({"Content-Type":"application/json", ...extra});
-const urlPublica = caminho => `${SB_URL}/storage/v1/object/public/artes/${caminho}`;
+/* cada documento guarda o objeto inteiro como texto JSON no campo "json" */
+const docJSON = obj => JSON.stringify({fields:{json:{stringValue:JSON.stringify(obj)}}});
+const lerDoc = d => { try{ return JSON.parse(d.fields.json.stringValue); }catch(e){ return null; } };
+async function fsListar(colecao){
+  let out = [], token = "";
+  do{
+    const j = await fs(`${colecao}?pageSize=300${token?`&pageToken=${encodeURIComponent(token)}`:""}`);
+    (j?.documents||[]).forEach(d => { const o = lerDoc(d); if(o) out.push(o); });
+    token = j?.nextPageToken || "";
+  }while(token);
+  return out;
+}
+/* links de foto: aceita link de página do Imgur e transforma no link direto da imagem */
+function normalizarFoto(url){
+  url = (url||"").trim(); if(!url) return "";
+  const m = url.match(/^https?:\/\/(?:m\.)?imgur\.com\/(?!a\/|gallery\/)([A-Za-z0-9]{5,10})$/);
+  if(m) return `https://i.imgur.com/${m[1]}.jpg`;
+  return url;
+}
 
-/* ---------- camada de dados: mesma interface para Supabase e GitHub ---------- */
+/* ---------- camada de dados: mesma interface para Firebase e GitHub ---------- */
 const PADRAO_LOJA = {loja:"PopZin", whatsapp:"", freteGratisAcima:120, descontoPix:0.05, fretes:{"Sul / Sudeste / Centro-Oeste":15,"Norte / Nordeste":30}, linkGrupoVip:"#", instagram:"#", precoChaveiro:1};
-const BD = modoSB ? {
-  async lerProdutos(){ return (await sb("/rest/v1/produtos?select=id,dados&order=id")).map(l => ({...l.dados, id:l.id})); },
-  async salvarProduto(p){ await sb("/rest/v1/produtos", {method:"POST", headers:jsonH({Prefer:"resolution=merge-duplicates,return=minimal"}), body:JSON.stringify({id:p.id, dados:p, atualizado:new Date().toISOString()})}); },
-  async salvarVarios(lista){ if(lista.length) await sb("/rest/v1/produtos", {method:"POST", headers:jsonH({Prefer:"resolution=merge-duplicates,return=minimal"}), body:JSON.stringify(lista.map(p=>({id:+p.id, dados:{...p, id:+p.id}})))}); },
-  async excluirProduto(p){ await sb(`/rest/v1/produtos?id=eq.${+p.id}`, {method:"DELETE"}); },
-  async lerLoja(){ const l = await sb("/rest/v1/loja?select=dados&id=eq.1"); return l?.[0]?.dados || null; },
-  async salvarLoja(obj){ await sb("/rest/v1/loja", {method:"POST", headers:jsonH({Prefer:"resolution=merge-duplicates,return=minimal"}), body:JSON.stringify({id:1, dados:obj, atualizado:new Date().toISOString()})}); },
-  async enviarFoto(blob, nome){ await sb(`/storage/v1/object/artes/${nome}`, {method:"POST", headers:{"Content-Type":blob.type, "cache-control":"31536000"}, body:blob}); return urlPublica(nome); },
-  async apagarFoto(foto){ const pre = `${SB_URL}/storage/v1/object/public/artes/`; if(foto?.startsWith(pre)) await sb(`/storage/v1/object/artes/${foto.slice(pre.length)}`, {method:"DELETE"}); },
+const BD = modoFB ? {
+  async lerProdutos(){ return (await fsListar("produtos")).sort((a,b)=>a.id-b.id); },
+  async salvarProduto(p){ await fs(`produtos/${+p.id}`, {method:"PATCH", body:docJSON(p)}); },
+  async salvarVarios(lista){ for(const p of lista) await fs(`produtos/${+p.id}`, {method:"PATCH", body:docJSON({...p, id:+p.id})}); },
+  async excluirProduto(p){ await fs(`produtos/${+p.id}`, {method:"DELETE"}); },
+  async lerLoja(){ const d = await fs("config/loja"); return d ? lerDoc(d) : null; },
+  async salvarLoja(obj){ await fs("config/loja", {method:"PATCH", body:docJSON(obj)}); },
+  async enviarFoto(){ throw new Error("No Firebase as fotos são por link."); },
+  async apagarFoto(){},
   aviso: "✅ Salvou, já está no site."
 } : {
   lerProdutos: () => lerJSON("produtos.json", []),
@@ -365,11 +395,12 @@ async function iniciar(){
     document.querySelectorAll(".caixa-login .sub").forEach(el => el.insertAdjacentHTML("afterend",
       `<div class="msg">⚠️ Conexão sem cadeado (http). O painel funciona, mas use só em rede confiável até o HTTPS do domínio ficar pronto. <a href="https://${location.host}${location.pathname}">Tentar https</a></div>`));
   }
-  if(modoSB){
+  if(modoFB){
     $("#lUserLbl").textContent = "E-mail"; $("#lUser").type = "email"; $("#lUser").autocomplete = "email";
-    $("#avisoTempo").textContent = "As alterações aparecem no site na hora (atualize a página da loja).";
-    sbSessao = lerSessaoSB();
-    if(sbSessao){ try{ await sbToken(); return entrarNoPainel(); }catch(e){ gravarSessaoSB(null); } }
+    $("#avisoTempo").textContent = "As alterações aparecem no site na hora (é só atualizar a página da loja).";
+    $("#fotoArquivo").classList.add("oculto"); $("#fotoLink").classList.remove("oculto");
+    fbSessao = lerSessaoFB();
+    if(fbSessao){ try{ await fbToken(); return entrarNoPainel(); }catch(e){ gravarSessaoFB(null); } }
     mostrar("#telaLogin"); return;
   }
   try{
@@ -410,9 +441,9 @@ $("#telaLogin").onsubmit = async e => {
   e.preventDefault();
   const el = $("#lMsg"), b = $("#btnLogin");
   b.disabled = true; msg(el,"Entrando...",true);
-  if(modoSB){
-    try{ await sbAuth("password", {email:$("#lUser").value.trim(), password:$("#lPass").value}); }
-    catch(err){ b.disabled=false; return msg(el, /invalid/i.test(err.message) ? "E-mail ou senha incorretos." : err.message); }
+  if(modoFB){
+    try{ await fbLogin($("#lUser").value.trim(), $("#lPass").value); }
+    catch(err){ b.disabled=false; return msg(el, err.message); }
     b.disabled = false; $("#lPass").value = ""; return entrarNoPainel();
   }
   try{
@@ -424,7 +455,7 @@ $("#telaLogin").onsubmit = async e => {
 };
 
 $("#btnSair").onclick = async () => {
-  if(modoSB){ try{ await fetch(`${SB_URL}/auth/v1/logout`, {method:"POST", headers:{apikey:SB.chave, Authorization:`Bearer ${sbSessao?.access_token}`}}); }catch(e){} gravarSessaoSB(null); }
+  if(modoFB) gravarSessaoFB(null);
   try{ sessionStorage.removeItem("popzin_sessao"); }catch(e){} sessao=null; location.reload();
 };
 
@@ -435,9 +466,9 @@ async function entrarNoPainel(){
     produtos = await BD.lerProdutos();
     loja = (await BD.lerLoja()) || {...PADRAO_LOJA};
     renderTabela(); preencherLoja();
-    if(modoSB && !produtos.length) mostrarImportar();
+    if(modoFB && !produtos.length) mostrarImportar();
   }catch(e){
-    if(modoSB && /expirada/.test(e.message)){ toast(e.message, true); return mostrar("#telaLogin"); }
+    if(modoFB && /expirada/.test(e.message)){ toast(e.message, true); return mostrar("#telaLogin"); }
     if(/401|403/.test(e.message)){ toast("Token inválido ou expirado. Refaça a configuração.", true); try{ sessionStorage.removeItem("popzin_sessao"); }catch(_){} }
     else toast(e.message, true);
   }
@@ -476,7 +507,7 @@ function abrirModal(p){
   $("#pNome").value = p?.nome || ""; $("#pTipo").value = p?.tipo || "animal"; $("#pColecao").value = p?.colecao || "";
   $("#pPreco").value = p?.preco ?? ""; $("#pDe").value = p?.de || ""; $("#pEstoque").value = p?.estoque ?? 0;
   $("#pVendidos").value = p?.vendidos ?? 0; $("#pEmoji").value = p?.emoji || ""; $("#pCor").value = p?.cor || "#f1ebff";
-  $("#pChav").checked = !p?.semChaveiro; $("#pNovo").checked = !!p?.novo; $("#pDestaque").checked = !!p?.destaque; $("#pFoto").value = "";
+  $("#pChav").checked = !p?.semChaveiro; $("#pNovo").checked = !!p?.novo; $("#pDestaque").checked = !!p?.destaque; $("#pFoto").value = ""; $("#pFotoUrl").value = p?.foto || "";
   atualizaPreview();
   $("#modal").classList.remove("oculto");
 }
@@ -487,12 +518,15 @@ $("#modal").onclick = e => { if(e.target.id==="modal") fecharModal(); };
 function atualizaPreview(){
   const pv = $("#preview");
   pv.style.background = $("#pCor").value;
+  const link = modoFB ? normalizarFoto($("#pFotoUrl").value) : "";
+  if(modoFB) { if(link) pv.innerHTML = `<img src="${esc(link)}" onerror="this.replaceWith('⚠️ link inválido')">`; else pv.textContent = $("#pEmoji").value || "🐾"; return; }
   if(novaFoto) pv.innerHTML = `<img src="${novaFoto.url}">`;
   else if(editando?.foto && !removerFoto) pv.innerHTML = `<img src="${esc(editando.foto)}?v=${editando.atualizado||""}">`;
   else pv.textContent = $("#pEmoji").value || "🐾";
 }
 $("#pEmoji").oninput = $("#pCor").oninput = atualizaPreview;
-$("#btnTirarFoto").onclick = () => { novaFoto=null; removerFoto=true; $("#pFoto").value=""; atualizaPreview(); };
+$("#btnTirarFoto").onclick = () => { novaFoto=null; removerFoto=true; $("#pFoto").value=""; $("#pFotoUrl").value=""; atualizaPreview(); };
+$("#pFotoUrl").oninput = () => atualizaPreview();
 
 /* redimensiona e comprime a imagem no navegador */
 async function prepararImagem(arquivo){
@@ -526,7 +560,8 @@ $("#formProduto").onsubmit = async e => {
       foto: editando?.foto || "", atualizado: Date.now()
     };
     const fotoAntiga = editando?.foto || "";
-    if(novaFoto){
+    if(modoFB){ p.foto = normalizarFoto($("#pFotoUrl").value); }
+    else if(novaFoto){
       b.textContent = "Enviando arte...";
       p.foto = await BD.enviarFoto(novaFoto.blob, `${id}-${slug(p.nome)}-${Date.now().toString(36)}.${novaFoto.ext}`);
     } else if(removerFoto) p.foto = "";
@@ -555,11 +590,11 @@ $("#btnExcluir").onclick = async () => {
   b.disabled = false; b.dataset.confirmar=""; b.textContent="Excluir";
 };
 
-/* ---------- importação única: GitHub (produtos.json/loja.json) → Supabase ---------- */
+/* ---------- importação única: GitHub (produtos.json/loja.json) → Firebase ---------- */
 function mostrarImportar(){
   const box = $("#importar"); box.classList.remove("oculto");
   box.innerHTML = `<h3>📦 Trazer os produtos do site atual</h3>
-    <div class="ajuda">O banco de dados está vazio. Clique abaixo para copiar os produtos e as configurações que já estão no site (arquivos do GitHub) para o banco. As fotos atuais continuam funcionando.</div>
+    <div class="ajuda">O banco de dados do Firebase está vazio. Clique abaixo para copiar os produtos e as configurações que já estão no site (arquivos do GitHub) para o banco. As fotos atuais continuam funcionando.</div>
     <button class="btn" id="btnImportar">Importar agora</button>`;
   $("#btnImportar").onclick = async () => {
     const b = $("#btnImportar"); b.disabled = true; b.textContent = "Importando...";
@@ -597,7 +632,7 @@ $("#btnSalvarLoja").onclick = async () => {
   loja = { loja:$("#cLoja").value.trim()||"PopZin", whatsapp:$("#cWhats").value.replace(/\D/g,""), freteGratisAcima:+$("#cFreteGratis").value||0,
            descontoPix:(+$("#cPix").value||0)/100, fretes, linkGrupoVip:$("#cVip").value.trim()||"#", instagram:$("#cInsta").value.trim()||"#",
            faixaTitulo:$("#cFaixaTitulo").value.trim(), faixaSub:$("#cFaixaSub").value.trim(), faixaOcultar:$("#cFaixaOcultar").checked, precoChaveiro:+$("#cChav").value||0 };
-  try{ await BD.salvarLoja(loja); toast(modoSB ? "Configurações salvas — já valem no site ✅" : "Configurações salvas ✅"); }
+  try{ await BD.salvarLoja(loja); toast(modoFB ? "Configurações salvas — já valem no site ✅" : "Configurações salvas ✅"); }
   catch(err){ toast(err.message, true); }
   b.disabled = false;
 };

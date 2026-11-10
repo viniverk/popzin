@@ -1,0 +1,27 @@
+rules_version = '2';
+// PopZin — regras do Firestore
+// Firebase → Firestore Database → aba "Regras" → cole tudo → troque o e-mail → Publicar
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function ehAdmin() {
+      return request.auth != null
+        && request.auth.token.email in ['SEU-EMAIL-AQUI@exemplo.com'];
+    }
+
+    // catálogo e configurações: qualquer visitante lê, só o administrador altera
+    match /produtos/{id} {
+      allow read: if true;
+      allow write: if ehAdmin();
+    }
+    match /config/{doc} {
+      allow read: if true;
+      allow write: if ehAdmin();
+    }
+
+    // qualquer outra coisa: bloqueado
+    match /{documento=**} {
+      allow read, write: if false;
+    }
+  }
+}

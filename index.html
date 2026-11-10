@@ -311,26 +311,29 @@ async function carregarJSON(arq){
   if(!r.ok) throw new Error(arq);
   return r.json();
 }
-/* Supabase (config.js): dados ao vivo, atualizados na hora pelo painel */
-const SB = window.POPZIN_SUPABASE || {};
-async function carregarSB(){
-  if(!(SB.url && SB.chave)) return null;
-  const base = SB.url.replace(/\/+$/,""), h = {apikey: SB.chave};
-  const [rp, rl] = await Promise.all([
-    fetch(`${base}/rest/v1/produtos?select=id,dados&order=id`, {headers:h, cache:"no-store"}),
-    fetch(`${base}/rest/v1/loja?select=dados&id=eq.1`, {headers:h, cache:"no-store"})
-  ]);
-  if(!rp.ok) return null;
-  const prods = (await rp.json()).map(l => ({...l.dados, id:l.id}));
-  const loja = rl.ok ? ((await rl.json())[0]?.dados || null) : null;
-  return prods.length ? {prods, loja} : null;      // banco vazio (antes de importar) → usa os arquivos
+/* Firebase (config.js): dados ao vivo no Firestore, atualizados na hora pelo painel */
+const FB = window.POPZIN_FIREBASE || {};
+async function carregarFB(){
+  if(!(FB.apiKey && FB.projectId)) return null;
+  const base = `https://firestore.googleapis.com/v1/projects/${FB.projectId}/databases/(default)/documents`;
+  const ler = d => { try{ return JSON.parse(d.fields.json.stringValue); }catch(e){ return null; } };
+  let prods = [], token = "";
+  do{
+    const r = await fetch(`${base}/produtos?pageSize=300&key=${FB.apiKey}${token?`&pageToken=${encodeURIComponent(token)}`:""}`, {cache:"no-store"});
+    if(!r.ok) return null;
+    const j = await r.json(); (j.documents||[]).forEach(d => { const o = ler(d); if(o) prods.push(o); });
+    token = j.nextPageToken || "";
+  }while(token);
+  const rl = await fetch(`${base}/config/loja?key=${FB.apiKey}`, {cache:"no-store"});
+  const loja = rl.ok ? ler(await rl.json()) : null;
+  return prods.length ? {prods: prods.sort((a,b)=>a.id-b.id), loja} : null;   // banco vazio (antes de importar) → usa os arquivos
 }
 async function iniciar(){
-  let viaSB = null;
-  try { viaSB = await carregarSB(); } catch(e){}
-  if(viaSB){
-    PRODUTOS = viaSB.prods;
-    if(viaSB.loja) CONFIG = {...CONFIG, ...viaSB.loja};
+  let viaBanco = null;
+  try { viaBanco = await carregarFB(); } catch(e){}
+  if(viaBanco){
+    PRODUTOS = viaBanco.prods;
+    if(viaBanco.loja) CONFIG = {...CONFIG, ...viaBanco.loja};
   } else {
     try { CONFIG = {...CONFIG, ...(await carregarJSON("loja.json"))}; } catch(e){}
     try { const p = await carregarJSON("produtos.json"); if(Array.isArray(p)) PRODUTOS = p; } catch(e){}
