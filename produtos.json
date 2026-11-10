@@ -21,11 +21,17 @@
     "nome": "Tubarão Flex",
     "tipo": "animal",
     "colecao": "Mar",
-    "preco": 29.9,
+    "preco": 11.5,
+    "de": 15.5,
+    "estoque": 20,
+    "vendidos": 30,
     "emoji": "🦈",
     "cor": "#dff3ff",
-    "estoque": 8,
-    "vendidos": 60
+    "novo": false,
+    "destaque": true,
+    "semChaveiro": false,
+    "foto": "img/2-tubarao-flex-mwaxj44c.webp",
+    "atualizado": 1794329625756
   },
   {
     "id": 3,
