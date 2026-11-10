@@ -34,18 +34,6 @@
     "atualizado": 1794329646084
   },
   {
-    "id": 3,
-    "nome": "Raposa Dobrável",
-    "tipo": "animal",
-    "colecao": "Floresta",
-    "preco": 27.9,
-    "emoji": "🦊",
-    "cor": "#ffead6",
-    "estoque": 5,
-    "vendidos": 45,
-    "novo": true
-  },
-  {
     "id": 4,
     "nome": "T-Rex Articulado",
     "tipo": "dino",
