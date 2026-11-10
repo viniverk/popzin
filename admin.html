@@ -148,6 +148,13 @@
           <label>Link do grupo VIP<input id="cVip"></label>
           <label>Link do Instagram<input id="cInsta"></label>
         </div>
+        <div style="display:grid;gap:10px;background:var(--fundo);border-radius:14px;padding:14px">
+          <b>Faixa do topo do site</b>
+          <label>Linha 1 (destaque)<input id="cFaixaTitulo" placeholder="Em branco = 🚚 Frete GRÁTIS para todo o Brasil acima de R$ ..."></label>
+          <label>Linha 2 (menor)<input id="cFaixaSub" placeholder="Em branco = valores de frete por região + prazo de envio"></label>
+          <label style="display:flex;align-items:center;gap:8px;color:var(--texto)"><input type="checkbox" id="cFaixaOcultar" style="width:auto"> Esconder a faixa</label>
+          <div class="ajuda">Deixe as linhas em branco para o texto ser montado sozinho com os valores de frete abaixo.</div>
+        </div>
         <div>
           <label style="margin-bottom:6px">Fretes por região (R$)</label>
           <div id="fretes" style="display:grid;gap:8px"></div>
@@ -457,6 +464,7 @@ function linhaFrete(nome="", valor=""){
 function preencherLoja(){
   $("#cLoja").value = loja.loja||""; $("#cWhats").value = loja.whatsapp||""; $("#cFreteGratis").value = loja.freteGratisAcima ?? 120;
   $("#cPix").value = Math.round((loja.descontoPix||0)*1000)/10; $("#cVip").value = loja.linkGrupoVip||""; $("#cInsta").value = loja.instagram||"";
+  $("#cFaixaTitulo").value = loja.faixaTitulo||""; $("#cFaixaSub").value = loja.faixaSub||""; $("#cFaixaOcultar").checked = !!loja.faixaOcultar;
   $("#fretes").innerHTML = ""; Object.entries(loja.fretes||{}).forEach(([n,v]) => linhaFrete(n,v));
 }
 $("#btnAddFrete").onclick = () => linhaFrete();
@@ -466,7 +474,8 @@ $("#btnSalvarLoja").onclick = async () => {
   $("#fretes").querySelectorAll(".fretes-linha").forEach(l => { const [n,v] = l.querySelectorAll("input"); if(n.value.trim()) fretes[n.value.trim()] = +v.value||0; });
   if(!Object.keys(fretes).length){ b.disabled=false; return toast("Cadastre pelo menos uma região de frete.", true); }
   loja = { loja:$("#cLoja").value.trim()||"PopZin", whatsapp:$("#cWhats").value.replace(/\D/g,""), freteGratisAcima:+$("#cFreteGratis").value||0,
-           descontoPix:(+$("#cPix").value||0)/100, fretes, linkGrupoVip:$("#cVip").value.trim()||"#", instagram:$("#cInsta").value.trim()||"#" };
+           descontoPix:(+$("#cPix").value||0)/100, fretes, linkGrupoVip:$("#cVip").value.trim()||"#", instagram:$("#cInsta").value.trim()||"#",
+           faixaTitulo:$("#cFaixaTitulo").value.trim(), faixaSub:$("#cFaixaSub").value.trim(), faixaOcultar:$("#cFaixaOcultar").checked };
   try{ await gravarJSON("loja.json", loja, "Atualiza configurações da loja"); toast("Configurações salvas ✅"); }
   catch(err){ toast(err.message, true); }
   b.disabled = false;

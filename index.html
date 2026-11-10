@@ -36,6 +36,12 @@
 
   .promo{background:var(--navy);color:#fff;text-align:center;font-size:.85rem;padding:8px 12px;font-weight:700}
   .promo small{display:block;font-weight:400;opacity:.9}
+  /* faixa piscando para chamar atenção */
+  #promoTitulo{display:inline-block;animation:pisca 1.1s ease-in-out infinite}
+  @keyframes pisca{0%,100%{color:#fff;transform:scale(1)}50%{color:var(--amarelo);transform:scale(1.05);text-shadow:0 0 12px rgba(255,194,26,.7)}}
+  .promo{animation:brilho 2.2s ease-in-out infinite}
+  @keyframes brilho{0%,100%{background:var(--navy)}50%{background:#2a1670}}
+  @media (prefers-reduced-motion: reduce){#promoTitulo,.promo{animation:none}}
 
   header{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--borda)}
   .topo{max-width:1200px;margin:auto;display:flex;align-items:center;justify-content:space-between;padding:12px 18px;gap:12px}
@@ -126,9 +132,9 @@
 </head>
 <body>
 
-<div class="promo">
-  🚚 Frete GRÁTIS para todo o Brasil acima de R$ 120
-  <small>Abaixo disso: R$ 15 (Sul, Sudeste e Centro-Oeste) · R$ 30 (Norte e Nordeste) · Pronta entrega sai em até 24h úteis</small>
+<div class="promo" id="promo">
+  <span id="promoTitulo">🚚 Frete GRÁTIS para todo o Brasil acima de R$ 120</span>
+  <small id="promoSub">Abaixo disso: R$ 15 (Sul, Sudeste e Centro-Oeste) · R$ 30 (Norte e Nordeste) · Pronta entrega sai em até 24h úteis</small>
 </div>
 
 <header>
@@ -286,6 +292,11 @@ async function iniciar(){
 }
 
 function montarTela(){
+/* faixa do topo: usa o texto do painel; se estiver vazio, monta a partir do frete */
+const freteTxt = Object.entries(CONFIG.fretes).map(([r,v]) => `${brl(v).replace(",00","")} (${r.replace(/ \/ /g,", ").replace(/, ([^,]*)$/," e $1")})`).join(" · ");
+$("#promoTitulo").textContent = CONFIG.faixaTitulo || `🚚 Frete GRÁTIS para todo o Brasil acima de ${brl(CONFIG.freteGratisAcima).replace(",00","")}`;
+$("#promoSub").textContent = CONFIG.faixaSub || `Abaixo disso: ${freteTxt} · Pronta entrega sai em até 24h úteis`;
+$("#promo").style.display = CONFIG.faixaOcultar ? "none" : "";
 $("#atalhos").innerHTML = ATALHOS.map(a =>
   `<a href="${a.vip ? CONFIG.linkGrupoVip : wa(a.msg)}" target="_blank" rel="noopener">${a.txt}${a.breve?'<span class="tag-breve">EM BREVE</span>':''}</a>`).join("");
 $("#lnkVip").href = CONFIG.linkGrupoVip;
