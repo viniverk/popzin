@@ -13,15 +13,15 @@ Site estático para o GitHub Pages. O painel (`admin.html`) salva produtos, arte
 | `admin-config.json` | Criado na 1ª configuração — token criptografado |
 
 ## Instalação (uma vez)
-1. **Crie o repositório** no GitHub (ex.: `pozin`), público.
+1. **Crie o repositório** no GitHub (ex.: `popzin`), público.
 2. **Suba todos os arquivos** desta pasta (Add file → Upload files).
 3. **Ative o Pages:** Settings → Pages → *Deploy from a branch* → `main` / `(root)` → Save.
-   O site fica em `https://viniverk.github.io/pozin/`.
+   O site fica em `https://viniverk.github.io/popzin/`.
 4. **Crie um token:** https://github.com/settings/personal-access-tokens/new
-   - *Repository access:* **Only select repositories** → `pozin`
+   - *Repository access:* **Only select repositories** → `popzin`
    - *Permissions → Contents:* **Read and write**
    - Escolha uma validade (ex.: 1 ano) e copie o token (`github_pat_...`).
-5. **Abra** `https://viniverk.github.io/pozin/admin.html`, preencha usuário do GitHub, repositório, token, e **crie seu usuário e senha do painel**.
+5. **Abra** `https://viniverk.github.io/popzin/admin.html`, preencha usuário do GitHub, repositório, token, e **crie seu usuário e senha do painel**.
 
 Pronto: dali em diante é só entrar com usuário e senha.
 
