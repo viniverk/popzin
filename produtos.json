@@ -4,9 +4,9 @@
     "nome": "Polvo Articulado",
     "tipo": "animal",
     "colecao": "Mar",
-    "preco": 24.9,
-    "de": 29.9,
-    "estoque": 12,
+    "preco": 11.5,
+    "de": 15.5,
+    "estoque": 30,
     "vendidos": 90,
     "emoji": "🐙",
     "cor": "#ffe1ec",
@@ -14,7 +14,7 @@
     "destaque": true,
     "semChaveiro": false,
     "foto": "img/1-polvo-articulado-mwaw1k66.webp",
-    "atualizado": 1794327127134
+    "atualizado": 1794327164465
   },
   {
     "id": 2,
