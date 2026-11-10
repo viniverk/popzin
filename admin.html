@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>PopZin — Painel do lojista</title>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--cor:#ff6b4a;--cor-esc:#e04e2e;--cor2:#2bb3a3;--fundo:#fff8f3;--texto:#3a2e2a;--suave:#8a7a73;--borda:#f1e3da;--erro:#d64545}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Nunito',sans-serif;background:var(--fundo);color:var(--texto);line-height:1.45}
+  h1,h2,h3,.logo{font-family:'Baloo 2',cursive}
+  button{font-family:inherit;cursor:pointer;border:none}
+  input,select,textarea{font-family:inherit;font-size:.95rem;border:1px solid var(--borda);border-radius:10px;padding:9px 11px;width:100%;background:#fff;color:var(--texto)}
+  label{font-size:.82rem;font-weight:700;color:var(--suave);display:grid;gap:4px}
+  .btn{background:var(--cor);color:#fff;border-radius:12px;padding:10px 16px;font-weight:800}
+  .btn:hover{background:var(--cor-esc)}
+  .btn.sec{background:#fff;color:var(--texto);border:1px solid var(--borda)}
+  .btn.perigo{background:#fff;color:var(--erro);border:1px solid #f3cccc}
+  .btn:disabled{opacity:.5;cursor:wait}
+  a.btn,header .btn{font-size:.88rem;padding:8px 14px}
+  .oculto{display:none!important}
+
+  .caixa-login{max-width:400px;margin:8vh auto;background:#fff;border:1px solid var(--borda);border-radius:22px;padding:28px;display:grid;gap:14px}
+  .logo{font-size:1.8rem;color:var(--cor);text-align:center}
+  .logo span{color:var(--cor2)}
+  .sub{color:var(--suave);font-size:.9rem;text-align:center}
+  .msg{font-size:.88rem;padding:9px 12px;border-radius:10px;background:#fdecec;color:var(--erro)}
+  .msg.ok{background:#e6f6f3;color:#1d7f74}
+  .ajuda{font-size:.8rem;color:var(--suave)}
+  .ajuda a{color:var(--cor2)}
+
+  header{background:#fff;border-bottom:1px solid var(--borda);position:sticky;top:0;z-index:10}
+  .topo{max-width:1100px;margin:auto;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .topo .logo{font-size:1.5rem;text-align:left}
+  .abas{display:flex;gap:6px}
+  .aba{background:var(--fundo);border:1px solid var(--borda);border-radius:999px;padding:7px 14px;font-weight:700;color:var(--texto)}
+  .aba.ativa{background:var(--cor);color:#fff;border-color:var(--cor)}
+  main{max-width:1100px;margin:auto;padding:20px 18px 60px}
+  .barra{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .barra input{flex:1;min-width:200px}
+
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--borda);border-radius:16px;overflow:hidden}
+  th,td{padding:10px;text-align:left;border-bottom:1px solid var(--borda);font-size:.9rem;vertical-align:middle}
+  th{background:var(--fundo);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--suave)}
+  .thumb{width:54px;height:54px;border-radius:10px;object-fit:cover;display:flex;align-items:center;justify-content:center;font-size:1.8rem;background:var(--fundo)}
+  td .acoes{display:flex;gap:6px}
+  td .acoes button{padding:6px 10px;font-size:.82rem}
+  .pill{font-size:.7rem;font-weight:800;border-radius:6px;padding:2px 6px;color:#fff;background:var(--cor2);margin-right:3px}
+  .pill.esg{background:#9a8f8a}
+
+  .modal-veu{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:flex-start;justify-content:center;padding:4vh 12px;overflow:auto;z-index:30}
+  .modal{background:#fff;border-radius:20px;padding:22px;width:min(720px,100%);display:grid;gap:14px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .foto-area{display:grid;grid-template-columns:160px 1fr;gap:14px;align-items:center}
+  .preview{width:160px;height:160px;border-radius:16px;border:2px dashed var(--borda);display:flex;align-items:center;justify-content:center;font-size:3.5rem;overflow:hidden;background:var(--fundo)}
+  .preview img{width:100%;height:100%;object-fit:cover}
+  .checks{display:flex;gap:18px;flex-wrap:wrap}
+  .checks label{display:flex;align-items:center;gap:6px;color:var(--texto);font-size:.92rem}
+  .checks input{width:auto}
+  .rodape-modal{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+
+  .cartao{background:#fff;border:1px solid var(--borda);border-radius:18px;padding:20px;display:grid;gap:14px;max-width:720px}
+  .fretes-linha{display:grid;grid-template-columns:1fr 120px 40px;gap:8px}
+
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(90px);background:var(--texto);color:#fff;padding:11px 20px;border-radius:999px;font-weight:700;transition:.25s;z-index:60;max-width:90vw;text-align:center}
+  .toast.on{transform:translateX(-50%) translateY(0)}
+  .toast.erro{background:var(--erro)}
+  @media(max-width:640px){
+    .foto-area{grid-template-columns:1fr}
+    .col-colecao,.col-estoque{display:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== CONFIGURAÇÃO INICIAL (só aparece na primeira vez) ===== -->
+<div id="telaSetup" class="caixa-login oculto">
+  <div class="logo">Pop<span>Zin</span> 🐾</div>
+  <div class="sub">Configuração inicial do painel — feita uma vez só.</div>
+  <label>Usuário do GitHub (dono do repositório)<input id="sOwner" placeholder="ex.: vinicios"></label>
+  <label>Nome do repositório<input id="sRepo" placeholder="ex.: popzin"></label>
+  <label>Branch<input id="sBranch" value="main"></label>
+  <label>Token do GitHub
+    <input id="sToken" type="password" placeholder="github_pat_...">
+  </label>
+  <div class="ajuda">Crie em <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a> → acesso só a este repositório → permissão <b>Contents: Read and write</b>.</div>
+  <hr style="border:none;border-top:1px solid var(--borda)">
+  <label>Crie seu usuário do painel<input id="sUser" autocomplete="username"></label>
+  <label>Crie sua senha (mín. 10 caracteres)<input id="sPass" type="password" autocomplete="new-password"></label>
+  <label>Repita a senha<input id="sPass2" type="password" autocomplete="new-password"></label>
+  <div id="sMsg" class="msg oculto"></div>
+  <button class="btn" id="btnSetup">Salvar e entrar</button>
+</div>
+
+<!-- ===== LOGIN ===== -->
+<form id="telaLogin" class="caixa-login oculto">
+  <div class="logo">Pop<span>Zin</span> 🐾</div>
+  <div class="sub">Painel do lojista</div>
+  <label>Usuário<input id="lUser" autocomplete="username" required></label>
+  <label>Senha<input id="lPass" type="password" autocomplete="current-password" required></label>
+  <div id="lMsg" class="msg oculto"></div>
+  <button class="btn" id="btnLogin" type="submit">Entrar</button>
+  <div class="ajuda" style="text-align:center"><a href="index.html">← voltar para a loja</a></div>
+</form>
+
+<!-- ===== PAINEL ===== -->
+<div id="telaPainel" class="oculto">
+  <header>
+    <div class="topo">
+      <div class="logo">Pop<span>Zin</span> · painel</div>
+      <div class="abas">
+        <button class="aba ativa" data-aba="produtos">🧸 Produtos</button>
+        <button class="aba" data-aba="loja">⚙️ Loja</button>
+      </div>
+      <div style="display:flex;gap:8px">
+        <a class="btn sec" href="index.html" target="_blank" rel="noopener" style="text-decoration:none">Ver loja ↗</a>
+        <button class="btn sec" id="btnSair">Sair</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="abaProdutos">
+      <div class="barra">
+        <input id="filtro" type="search" placeholder="🔍 Buscar produto...">
+        <button class="btn" id="btnNovo">+ Novo produto</button>
+      </div>
+      <div class="ajuda" style="margin-bottom:10px">Depois de salvar, o site leva cerca de 1 minuto para atualizar no GitHub Pages.</div>
+      <table>
+        <thead><tr><th></th><th>Produto</th><th class="col-colecao">Coleção</th><th>Preço</th><th class="col-estoque">Estoque</th><th></th></tr></thead>
+        <tbody id="tabela"></tbody>
+      </table>
+    </section>
+
+    <section id="abaLoja" class="oculto">
+      <div class="cartao">
+        <h3>Configurações da loja</h3>
+        <div class="grid2">
+          <label>Nome da loja<input id="cLoja"></label>
+          <label>WhatsApp (DDI+DDD+número)<input id="cWhats" placeholder="5547999999999"></label>
+          <label>Frete grátis acima de (R$)<input id="cFreteGratis" type="number" step="0.01"></label>
+          <label>Desconto no Pix (%)<input id="cPix" type="number" step="0.5"></label>
+          <label>Link do grupo VIP<input id="cVip"></label>
+          <label>Link do Instagram<input id="cInsta"></label>
+        </div>
+        <div>
+          <label style="margin-bottom:6px">Fretes por região (R$)</label>
+          <div id="fretes" style="display:grid;gap:8px"></div>
+          <button class="btn sec" id="btnAddFrete" style="margin-top:8px">+ região</button>
+        </div>
+        <button class="btn" id="btnSalvarLoja">Salvar configurações</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ===== MODAL PRODUTO ===== -->
+<div id="modal" class="modal-veu oculto">
+  <form class="modal" id="formProduto">
+    <h3 id="mTitulo">Novo produto</h3>
+    <div class="foto-area">
+      <div class="preview" id="preview">🐾</div>
+      <div style="display:grid;gap:8px">
+        <label>Arte / foto do produto<input type="file" id="pFoto" accept="image/*"></label>
+        <div class="ajuda">A imagem é redimensionada (máx. 1000px) e comprimida antes de subir.</div>
+        <button type="button" class="btn sec" id="btnTirarFoto">Remover foto</button>
+      </div>
+    </div>
+    <div class="grid2">
+      <label style="grid-column:1/-1">Nome<input id="pNome" required></label>
+      <label>Tipo
+        <select id="pTipo"><option value="animal">🐾 Animal</option><option value="mini">🧸 Mini</option><option value="dino">🦖 Dino</option></select>
+      </label>
+      <label>Coleção<input id="pColecao" list="listaColecoes" placeholder="Mar, Fazenda, Natal..."></label>
+      <label>Preço (R$)<input id="pPreco" type="number" step="0.01" min="0" required></label>
+      <label>Preço "de" (opcional)<input id="pDe" type="number" step="0.01" min="0"></label>
+      <label>Estoque<input id="pEstoque" type="number" min="0" value="0"></label>
+      <label>Vendidos (ordenação)<input id="pVendidos" type="number" min="0" value="0"></label>
+      <label>Emoji (sem foto)<input id="pEmoji" maxlength="8" placeholder="🐙"></label>
+      <label>Cor de fundo<input id="pCor" type="color" value="#fff1e8" style="height:42px;padding:4px"></label>
+    </div>
+    <datalist id="listaColecoes"></datalist>
+    <div class="checks">
+      <label><input type="checkbox" id="pNovo"> Novidade</label>
+      <label><input type="checkbox" id="pDestaque"> Destaque</label>
+    </div>
+    <div class="rodape-modal">
+      <button type="button" class="btn perigo" id="btnExcluir">Excluir</button>
+      <div style="display:flex;gap:8px">
+        <button type="button" class="btn sec" id="btnCancelar">Cancelar</button>
+        <button type="submit" class="btn" id="btnSalvarProduto">Salvar</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   Painel PopZin — salva direto no repositório via API do GitHub.
+   O token fica no arquivo admin-config.json CRIPTOGRAFADO com
+   seu usuário+senha (PBKDF2 + AES-GCM). Sem a senha, ninguém usa.
+   ========================================================= */
+const ARQ_CONFIG = "admin-config.json";
+const $ = s => document.querySelector(s);
+const API = "https://api.github.com";
+let sessao = null;          // {owner, repo, branch, token}
+let produtos = [], loja = {};
+let editando = null, novaFoto = null, removerFoto = false;
+
+/* ---------- utilidades ---------- */
+let tt;
+function toast(t, erro){ const el=$("#toast"); el.textContent=t; el.classList.toggle("erro",!!erro); el.classList.add("on"); clearTimeout(tt); tt=setTimeout(()=>el.classList.remove("on"), erro?5000:2500); }
+function mostrar(id){ ["#telaSetup","#telaLogin","#telaPainel"].forEach(s=>$(s).classList.toggle("oculto", s!==id)); }
+function msg(el, t, ok){ el.textContent=t; el.classList.remove("oculto"); el.classList.toggle("ok",!!ok); }
+const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const deb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const utf8b64 = s => { const bytes = new TextEncoder().encode(s); let bin=""; bytes.forEach(b=>bin+=String.fromCharCode(b)); return btoa(bin); };
+const b64utf8 = s => new TextDecoder().decode(deb64(s.replace(/\s/g,"")));
+const brl = v => (+v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const slug = s => s.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40) || "produto";
+const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ---------- criptografia ---------- */
+async function chave(user, pass, salt){
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(user.trim().toLowerCase()+":"+pass), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"PBKDF2", salt, iterations:310000, hash:"SHA-256"}, base, {name:"AES-GCM", length:256}, false, ["encrypt","decrypt"]);
+}
+async function cifrar(texto, user, pass){
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const k = await chave(user, pass, salt);
+  const dados = await crypto.subtle.encrypt({name:"AES-GCM", iv}, k, new TextEncoder().encode(texto));
+  return {salt:b64(salt), iv:b64(iv), dados:b64(dados)};
+}
+async function decifrar(c, user, pass){
+  const k = await chave(user, pass, deb64(c.salt));
+  const t = await crypto.subtle.decrypt({name:"AES-GCM", iv:deb64(c.iv)}, k, deb64(c.dados));
+  return new TextDecoder().decode(t);
+}
+
+/* ---------- API do GitHub ---------- */
+async function gh(caminho, opts={}, s=sessao){
+  const r = await fetch(`${API}/repos/${s.owner}/${s.repo}/contents/${caminho}` + (opts.method ? "" : `?ref=${encodeURIComponent(s.branch)}&t=${Date.now()}`), {
+    ...opts,
+    headers:{ "Authorization":`Bearer ${s.token}`, "Accept":"application/vnd.github+json", "X-GitHub-Api-Version":"2022-11-28", ...(opts.body?{"Content-Type":"application/json"}:{}) }
+  });
+  if(r.status===404 && !opts.method) return null;
+  if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(`GitHub ${r.status}: ${e.message||"erro"}`); }
+  return r.status===204 ? {} : r.json();
+}
+async function shaDe(caminho, s){ const f = await gh(caminho, {}, s); return f ? f.sha : undefined; }
+async function gravar(caminho, conteudoB64, mensagem, s=sessao){
+  const sha = await shaDe(caminho, s);
+  return gh(caminho, {method:"PUT", body:JSON.stringify({message:mensagem, content:conteudoB64, branch:s.branch, ...(sha?{sha}:{})})}, s);
+}
+async function apagar(caminho, mensagem){
+  const sha = await shaDe(caminho); if(!sha) return;
+  return gh(caminho, {method:"DELETE", body:JSON.stringify({message:mensagem, sha, branch:sessao.branch})});
+}
+async function lerJSON(caminho, padrao){ const f = await gh(caminho); return f ? JSON.parse(b64utf8(f.content)) : padrao; }
+const gravarJSON = (caminho, obj, mensagem) => gravar(caminho, utf8b64(JSON.stringify(obj, null, 2)), mensagem);
+
+/* ---------- início: setup ou login ---------- */
+let cfgCripto = null;
+async function iniciar(){
+  try{
+    const r = await fetch(ARQ_CONFIG + "?v=" + Date.now(), {cache:"no-store"});
+    if(r.ok){ cfgCripto = await r.json(); }
+  }catch(e){}
+  const salva = (()=>{ try{ return JSON.parse(sessionStorage.getItem("popzin_sessao")) }catch(e){ return null } })();
+  if(cfgCripto && salva){ sessao = salva; return entrarNoPainel(); }
+  if(cfgCripto){ mostrar("#telaLogin"); return; }
+  // sugere owner/repo a partir do endereço do GitHub Pages (usuario.github.io/repo)
+  const h = location.hostname;
+  if(h.endsWith(".github.io")){ $("#sOwner").value = h.replace(".github.io",""); $("#sRepo").value = location.pathname.split("/").filter(Boolean)[0] || h; }
+  mostrar("#telaSetup");
+}
+
+$("#btnSetup").onclick = async () => {
+  const el = $("#sMsg"), b = $("#btnSetup");
+  const s = { owner:$("#sOwner").value.trim(), repo:$("#sRepo").value.trim(), branch:$("#sBranch").value.trim()||"main", token:$("#sToken").value.trim() };
+  const user = $("#sUser").value.trim(), pass = $("#sPass").value;
+  if(!s.owner||!s.repo||!s.token||!user) return msg(el,"Preencha todos os campos.");
+  if(pass.length < 10) return msg(el,"A senha precisa ter pelo menos 10 caracteres.");
+  if(pass !== $("#sPass2").value) return msg(el,"As senhas não conferem.");
+  b.disabled = true; msg(el,"Testando acesso ao repositório...",true);
+  try{
+    const r = await fetch(`${API}/repos/${s.owner}/${s.repo}`, {headers:{Authorization:`Bearer ${s.token}`}});
+    if(!r.ok) throw new Error("Não consegui acessar o repositório com esse token. Confira usuário, nome do repo e permissões.");
+    const info = await r.json();
+    if(!info.permissions || !info.permissions.push) throw new Error("O token não tem permissão de escrita (Contents: Read and write).");
+    const cripto = await cifrar(JSON.stringify(s), user, pass);
+    await gravar(ARQ_CONFIG, utf8b64(JSON.stringify({versao:1, ...cripto}, null, 2)), "Configura painel PopZin", s);
+    sessao = s; sessionStorage.setItem("popzin_sessao", JSON.stringify(s));
+    entrarNoPainel();
+  }catch(e){ msg(el, e.message); }
+  b.disabled = false;
+};
+
+$("#telaLogin").onsubmit = async e => {
+  e.preventDefault();
+  const el = $("#lMsg"), b = $("#btnLogin");
+  b.disabled = true; msg(el,"Entrando...",true);
+  try{
+    sessao = JSON.parse(await decifrar(cfgCripto, $("#lUser").value, $("#lPass").value));
+  }catch(err){ b.disabled=false; await new Promise(r=>setTimeout(r,800)); return msg(el,"Usuário ou senha incorretos."); }
+  try{ sessionStorage.setItem("popzin_sessao", JSON.stringify(sessao)); }catch(e){}
+  b.disabled = false; $("#lPass").value = "";
+  entrarNoPainel();
+};
+
+$("#btnSair").onclick = () => { try{ sessionStorage.removeItem("popzin_sessao"); }catch(e){} sessao=null; location.reload(); };
+
+async function entrarNoPainel(){
+  mostrar("#telaPainel");
+  $("#tabela").innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--suave);padding:30px">Carregando...</td></tr>`;
+  try{
+    produtos = await lerJSON("produtos.json", []);
+    loja = await lerJSON("loja.json", {loja:"PopZin", whatsapp:"", freteGratisAcima:120, descontoPix:0.05, fretes:{"Sul / Sudeste / Centro-Oeste":15,"Norte / Nordeste":30}, linkGrupoVip:"#", instagram:"#"});
+    renderTabela(); preencherLoja();
+  }catch(e){
+    if(/401|403/.test(e.message)){ toast("Token inválido ou expirado. Refaça a configuração.", true); try{ sessionStorage.removeItem("popzin_sessao"); }catch(_){} }
+    else toast(e.message, true);
+  }
+}
+
+/* ---------- abas ---------- */
+document.querySelectorAll(".aba").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".aba").forEach(x=>x.classList.toggle("ativa", x===b));
+  $("#abaProdutos").classList.toggle("oculto", b.dataset.aba!=="produtos");
+  $("#abaLoja").classList.toggle("oculto", b.dataset.aba!=="loja");
+});
+
+/* ---------- produtos ---------- */
+function renderTabela(){
+  const f = $("#filtro").value.toLowerCase();
+  const lista = produtos.filter(p => !f || (p.nome+" "+(p.colecao||"")).toLowerCase().includes(f));
+  $("#tabela").innerHTML = lista.length ? lista.map(p => `
+    <tr>
+      <td>${p.foto ? `<img class="thumb" src="${esc(p.foto)}?v=${p.atualizado||""}" alt="">` : `<div class="thumb" style="background:${esc(p.cor||'#f5eee9')}">${esc(p.emoji||"🐾")}</div>`}</td>
+      <td><b>${esc(p.nome)}</b><br>${p.novo?'<span class="pill">NOVO</span>':''}${p.destaque?'<span class="pill" style="background:var(--cor)">DESTAQUE</span>':''}${!+p.estoque?'<span class="pill esg">ESGOTADO</span>':''}</td>
+      <td class="col-colecao">${esc(p.colecao||"")}</td>
+      <td>${brl(p.preco)}${+p.de?`<br><s style="color:var(--suave);font-size:.8rem">${brl(p.de)}</s>`:""}</td>
+      <td class="col-estoque">${+p.estoque||0}</td>
+      <td><div class="acoes"><button class="btn sec" data-editar="${p.id}">Editar</button></div></td>
+    </tr>`).join("") : `<tr><td colspan="6" style="text-align:center;color:var(--suave);padding:30px">Nenhum produto ainda. Clique em “+ Novo produto”.</td></tr>`;
+  $("#listaColecoes").innerHTML = [...new Set(produtos.map(p=>p.colecao).filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join("");
+}
+$("#filtro").oninput = renderTabela;
+$("#tabela").onclick = e => { const b = e.target.closest("[data-editar]"); if(b) abrirModal(produtos.find(p=>p.id==b.dataset.editar)); };
+$("#btnNovo").onclick = () => abrirModal(null);
+
+function abrirModal(p){
+  editando = p; novaFoto = null; removerFoto = false;
+  $("#mTitulo").textContent = p ? "Editar produto" : "Novo produto";
+  $("#btnExcluir").classList.toggle("oculto", !p);
+  $("#pNome").value = p?.nome || ""; $("#pTipo").value = p?.tipo || "animal"; $("#pColecao").value = p?.colecao || "";
+  $("#pPreco").value = p?.preco ?? ""; $("#pDe").value = p?.de || ""; $("#pEstoque").value = p?.estoque ?? 0;
+  $("#pVendidos").value = p?.vendidos ?? 0; $("#pEmoji").value = p?.emoji || ""; $("#pCor").value = p?.cor || "#fff1e8";
+  $("#pNovo").checked = !!p?.novo; $("#pDestaque").checked = !!p?.destaque; $("#pFoto").value = "";
+  atualizaPreview();
+  $("#modal").classList.remove("oculto");
+}
+function fecharModal(){ $("#modal").classList.add("oculto"); }
+$("#btnCancelar").onclick = fecharModal;
+$("#modal").onclick = e => { if(e.target.id==="modal") fecharModal(); };
+
+function atualizaPreview(){
+  const pv = $("#preview");
+  pv.style.background = $("#pCor").value;
+  if(novaFoto) pv.innerHTML = `<img src="${novaFoto.url}">`;
+  else if(editando?.foto && !removerFoto) pv.innerHTML = `<img src="${esc(editando.foto)}?v=${editando.atualizado||""}">`;
+  else pv.textContent = $("#pEmoji").value || "🐾";
+}
+$("#pEmoji").oninput = $("#pCor").oninput = atualizaPreview;
+$("#btnTirarFoto").onclick = () => { novaFoto=null; removerFoto=true; $("#pFoto").value=""; atualizaPreview(); };
+
+/* redimensiona e comprime a imagem no navegador */
+async function prepararImagem(arquivo){
+  const img = await createImageBitmap(arquivo);
+  const max = 1000, esc = Math.min(1, max/Math.max(img.width, img.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.width*esc); c.height = Math.round(img.height*esc);
+  c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+  let blob = await new Promise(r => c.toBlob(r, "image/webp", 0.85));
+  let ext = "webp";
+  if(!blob || blob.type !== "image/webp"){ blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85)); ext = "jpg"; }
+  return { blob, ext, url: URL.createObjectURL(blob) };
+}
+$("#pFoto").onchange = async e => {
+  const f = e.target.files[0]; if(!f) return;
+  if(f.size > 25*1024*1024) return toast("Imagem muito grande (máx. 25 MB).", true);
+  try{ novaFoto = await prepararImagem(f); removerFoto = false; atualizaPreview(); }
+  catch(err){ toast("Não consegui ler essa imagem.", true); }
+};
+const blobB64 = blob => new Promise((ok, erro) => { const r = new FileReader(); r.onload = () => ok(r.result.split(",")[1]); r.onerror = erro; r.readAsDataURL(blob); });
+
+$("#formProduto").onsubmit = async e => {
+  e.preventDefault();
+  const b = $("#btnSalvarProduto"); b.disabled = true; b.textContent = "Salvando...";
+  try{
+    const id = editando ? editando.id : (Math.max(0, ...produtos.map(p=>+p.id||0)) + 1);
+    const p = {
+      id, nome:$("#pNome").value.trim(), tipo:$("#pTipo").value, colecao:$("#pColecao").value.trim(),
+      preco:+$("#pPreco").value||0, de:+$("#pDe").value||0, estoque:+$("#pEstoque").value||0, vendidos:+$("#pVendidos").value||0,
+      emoji:$("#pEmoji").value.trim(), cor:$("#pCor").value, novo:$("#pNovo").checked, destaque:$("#pDestaque").checked,
+      foto: editando?.foto || "", atualizado: Date.now()
+    };
+    const fotoAntiga = editando?.foto || "";
+    if(novaFoto){
+      b.textContent = "Enviando arte...";
+      const caminho = `img/${id}-${slug(p.nome)}-${Date.now().toString(36)}.${novaFoto.ext}`;
+      await gravar(caminho, await blobB64(novaFoto.blob), `Arte: ${p.nome}`);
+      p.foto = caminho;
+    } else if(removerFoto) p.foto = "";
+    if(!p.de || p.de <= p.preco) p.de = 0;
+
+    b.textContent = "Atualizando catálogo...";
+    const atual = await lerJSON("produtos.json", []);           // pega a versão mais nova antes de gravar
+    const i = atual.findIndex(x => x.id == id);
+    if(i >= 0) atual[i] = p; else atual.push(p);
+    await gravarJSON("produtos.json", atual, `${editando?"Edita":"Adiciona"} produto: ${p.nome}`);
+    produtos = atual;
+    if(fotoAntiga && fotoAntiga !== p.foto && fotoAntiga.startsWith("img/")) apagar(fotoAntiga, `Remove arte antiga: ${p.nome}`).catch(()=>{});
+    renderTabela(); fecharModal(); toast("Salvo! O site atualiza em ~1 min ✅");
+  }catch(err){ toast(err.message, true); }
+  b.disabled = false; b.textContent = "Salvar";
+};
+
+$("#btnExcluir").onclick = async () => {
+  if(!editando) return;
+  const b = $("#btnExcluir");
+  if(b.dataset.confirmar !== "1"){ b.dataset.confirmar="1"; b.textContent="Clique de novo para confirmar"; setTimeout(()=>{ b.dataset.confirmar=""; b.textContent="Excluir"; }, 3000); return; }
+  b.disabled = true;
+  try{
+    const atual = (await lerJSON("produtos.json", [])).filter(x => x.id != editando.id);
+    await gravarJSON("produtos.json", atual, `Remove produto: ${editando.nome}`);
+    if(editando.foto?.startsWith("img/")) apagar(editando.foto, `Remove arte: ${editando.nome}`).catch(()=>{});
+    produtos = atual; renderTabela(); fecharModal(); toast("Produto excluído.");
+  }catch(err){ toast(err.message, true); }
+  b.disabled = false; b.dataset.confirmar=""; b.textContent="Excluir";
+};
+
+/* ---------- configurações da loja ---------- */
+function linhaFrete(nome="", valor=""){
+  const d = document.createElement("div"); d.className = "fretes-linha";
+  d.innerHTML = `<input placeholder="Região" value="${esc(nome)}"><input type="number" step="0.01" placeholder="R$" value="${esc(valor)}"><button class="btn sec" type="button" title="Remover">✕</button>`;
+  d.querySelector("button").onclick = () => d.remove();
+  $("#fretes").appendChild(d);
+}
+function preencherLoja(){
+  $("#cLoja").value = loja.loja||""; $("#cWhats").value = loja.whatsapp||""; $("#cFreteGratis").value = loja.freteGratisAcima ?? 120;
+  $("#cPix").value = Math.round((loja.descontoPix||0)*1000)/10; $("#cVip").value = loja.linkGrupoVip||""; $("#cInsta").value = loja.instagram||"";
+  $("#fretes").innerHTML = ""; Object.entries(loja.fretes||{}).forEach(([n,v]) => linhaFrete(n,v));
+}
+$("#btnAddFrete").onclick = () => linhaFrete();
+$("#btnSalvarLoja").onclick = async () => {
+  const b = $("#btnSalvarLoja"); b.disabled = true;
+  const fretes = {};
+  $("#fretes").querySelectorAll(".fretes-linha").forEach(l => { const [n,v] = l.querySelectorAll("input"); if(n.value.trim()) fretes[n.value.trim()] = +v.value||0; });
+  if(!Object.keys(fretes).length){ b.disabled=false; return toast("Cadastre pelo menos uma região de frete.", true); }
+  loja = { loja:$("#cLoja").value.trim()||"PopZin", whatsapp:$("#cWhats").value.replace(/\D/g,""), freteGratisAcima:+$("#cFreteGratis").value||0,
+           descontoPix:(+$("#cPix").value||0)/100, fretes, linkGrupoVip:$("#cVip").value.trim()||"#", instagram:$("#cInsta").value.trim()||"#" };
+  try{ await gravarJSON("loja.json", loja, "Atualiza configurações da loja"); toast("Configurações salvas ✅"); }
+  catch(err){ toast(err.message, true); }
+  b.disabled = false;
+};
+
+iniciar();
+</script>
+</body>
+</html>

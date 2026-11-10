@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PopZin — Catálogo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ====== CORES DA MARCA — troque aqui ====== */
+  :root{
+    --cor:#ff6b4a;        /* cor principal */
+    --cor-esc:#e04e2e;
+    --cor2:#2bb3a3;       /* cor de apoio */
+    --fundo:#fff8f3;
+    --card:#ffffff;
+    --texto:#3a2e2a;
+    --suave:#8a7a73;
+    --borda:#f1e3da;
+    --raio:18px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Nunito',sans-serif;background:var(--fundo);color:var(--texto);line-height:1.45}
+  h1,h2,h3,.logo{font-family:'Baloo 2',cursive}
+  button{font-family:inherit;cursor:pointer;border:none}
+  a{color:inherit}
+
+  .promo{background:var(--cor2);color:#fff;text-align:center;font-size:.85rem;padding:8px 12px;font-weight:700}
+  .promo small{display:block;font-weight:400;opacity:.9}
+
+  header{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--borda)}
+  .topo{max-width:1200px;margin:auto;display:flex;align-items:center;justify-content:space-between;padding:12px 18px;gap:12px}
+  .logo{font-size:1.7rem;font-weight:800;color:var(--cor);text-decoration:none}
+  .logo span{color:var(--cor2)}
+  .acoes{display:flex;gap:8px}
+  .btn-icone{background:var(--fundo);border:1px solid var(--borda);border-radius:999px;padding:8px 14px;font-weight:700;font-size:.95rem;color:var(--texto)}
+  .btn-icone b{background:var(--cor);color:#fff;border-radius:999px;padding:0 7px;margin-left:4px;font-size:.8rem}
+
+  .atalhos{max-width:1200px;margin:auto;display:flex;gap:8px;overflow-x:auto;padding:0 18px 12px}
+  .atalhos a{white-space:nowrap;text-decoration:none;background:#fff;border:1px solid var(--borda);border-radius:999px;padding:6px 14px;font-size:.85rem;font-weight:600}
+  .atalhos a:hover{border-color:var(--cor);color:var(--cor)}
+  .tag-breve{background:var(--cor2);color:#fff;font-size:.65rem;border-radius:6px;padding:1px 5px;margin-left:4px}
+
+  .hero{max-width:1200px;margin:24px auto 8px;padding:34px 24px;border-radius:28px;background:linear-gradient(135deg,var(--cor),#ff9a6b);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+  .hero h1{font-size:clamp(1.8rem,4vw,2.8rem);line-height:1.1}
+  .hero p{opacity:.95;margin-top:6px;max-width:520px}
+  .hero .emojis{font-size:clamp(2.5rem,7vw,4.5rem);letter-spacing:6px}
+  .wrap{max-width:1200px;margin:auto;padding:0 18px}
+
+  .controles{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:22px 0 14px}
+  .abas{display:flex;gap:6px;flex-wrap:wrap}
+  .aba{background:#fff;border:1px solid var(--borda);border-radius:999px;padding:8px 16px;font-weight:700;color:var(--texto)}
+  .aba.ativa{background:var(--cor);border-color:var(--cor);color:#fff}
+  .controles select,.controles input{border:1px solid var(--borda);border-radius:12px;padding:9px 12px;font-family:inherit;font-size:.92rem;background:#fff;color:var(--texto)}
+  .controles input{flex:1;min-width:180px}
+  .contagem{color:var(--suave);font-size:.9rem;margin-bottom:10px}
+
+  .grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:40px}
+  .card{background:var(--card);border-radius:var(--raio);border:1px solid var(--borda);overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,box-shadow .15s}
+  .card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(224,78,46,.12)}
+  .foto{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:4.5rem}
+  .foto img{width:100%;height:100%;object-fit:cover}
+  .fav{position:absolute;top:8px;right:8px;background:#fff;border-radius:50%;width:36px;height:36px;font-size:1.1rem;box-shadow:0 2px 6px rgba(0,0,0,.1)}
+  .selo{position:absolute;top:8px;left:8px;background:var(--cor);color:#fff;font-size:.72rem;font-weight:800;border-radius:8px;padding:3px 8px}
+  .selo.novo{background:var(--cor2)}
+  .selo.esgot{background:#9a8f8a}
+  .info{padding:12px 14px 14px;display:flex;flex-direction:column;gap:4px;flex:1}
+  .colecao{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--suave);font-weight:700}
+  .nome{font-weight:700;font-size:1rem}
+  .precos{margin-top:auto;padding-top:6px}
+  .de{text-decoration:line-through;color:var(--suave);font-size:.82rem;margin-right:4px}
+  .preco{font-weight:800;font-size:1.15rem}
+  .pix{font-size:.8rem;color:var(--cor2);font-weight:700}
+  .btn{background:var(--cor);color:#fff;border-radius:12px;padding:10px;font-weight:800;margin-top:8px;width:100%;font-size:.92rem}
+  .btn:hover{background:var(--cor-esc)}
+  .btn.sec{background:#fff;color:var(--texto);border:1px solid var(--borda)}
+  .vazio{grid-column:1/-1;text-align:center;color:var(--suave);padding:40px}
+
+  section.bloco{margin:10px 0 44px}
+  section.bloco h2{font-size:1.7rem;margin-bottom:14px}
+  .depo{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+  .depo div{background:#fff;border:1px solid var(--borda);border-radius:var(--raio);padding:18px}
+  .depo b{display:block;margin-top:10px;color:var(--cor)}
+  .sobre{background:#fff;border:1px solid var(--borda);border-radius:var(--raio);padding:22px;display:grid;gap:10px}
+
+  footer{background:var(--texto);color:#f4e9e3;padding:30px 18px;text-align:center;font-size:.9rem}
+  footer .links{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:10px}
+  footer a{text-decoration:none;opacity:.85}
+
+  /* carrinho */
+  .veu{position:fixed;inset:0;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:.2s;z-index:40}
+  .veu.aberto{opacity:1;pointer-events:auto}
+  .gaveta{position:fixed;top:0;right:0;height:100%;width:min(420px,100%);background:#fff;z-index:50;transform:translateX(100%);transition:.25s;display:flex;flex-direction:column}
+  .gaveta.aberto{transform:none}
+  .g-topo{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid var(--borda)}
+  .g-topo h3{font-size:1.4rem}
+  .g-itens{flex:1;overflow:auto;padding:12px 18px}
+  .item{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px dashed var(--borda)}
+  .item .mini{width:52px;height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0}
+  .item .txt{flex:1;font-size:.9rem}
+  .qtd{display:flex;align-items:center;gap:6px}
+  .qtd button{width:28px;height:28px;border-radius:8px;background:var(--fundo);border:1px solid var(--borda);font-weight:800}
+  .g-rodape{padding:16px 18px;border-top:1px solid var(--borda);display:grid;gap:8px;font-size:.92rem}
+  .linha{display:flex;justify-content:space-between}
+  .total{font-weight:800;font-size:1.15rem}
+  .g-rodape select,.g-rodape input{width:100%;padding:9px;border-radius:10px;border:1px solid var(--borda);font-family:inherit}
+  .barra{height:8px;background:var(--fundo);border-radius:99px;overflow:hidden}
+  .barra i{display:block;height:100%;background:var(--cor2)}
+  a.btn{display:block;text-align:center;text-decoration:none}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--texto);color:#fff;padding:10px 18px;border-radius:999px;font-weight:700;transition:.25s;z-index:60}
+  .toast.on{transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="promo">
+  🚚 Frete GRÁTIS para todo o Brasil acima de R$ 120
+  <small>Abaixo disso: R$ 15 (Sul, Sudeste e Centro-Oeste) · R$ 30 (Norte e Nordeste) · Pronta entrega sai em até 24h úteis</small>
+</div>
+
+<header>
+  <div class="topo">
+    <a class="logo" href="#">Pop<span>Zin</span> 🐾</a>
+    <div class="acoes">
+      <button class="btn-icone" id="btnFavs">🤍 <span id="nFavs">0</span></button>
+      <button class="btn-icone" id="btnCarrinho">🛒 Carrinho <b id="nCarrinho">0</b></button>
+    </div>
+  </div>
+  <nav class="atalhos" id="atalhos"></nav>
+</header>
+
+<div class="wrap">
+  <div class="hero">
+    <div>
+      <h1>Bichinhos articulados<br>impressos em 3D</h1>
+      <p>Colecionáveis que mexem, dobram e encantam. Feitos um a um, com carinho, para colecionar ou presentear.</p>
+    </div>
+    <div class="emojis">🦖🐙🦊</div>
+  </div>
+
+  <div class="controles">
+    <div class="abas" id="abas"></div>
+    <select id="selColecao"></select>
+    <select id="selOrdem">
+      <option value="destaque">⭐ Destaques</option>
+      <option value="vendidos">🔥 Mais vendidos</option>
+      <option value="menor">💰 Menor preço</option>
+      <option value="maior">💎 Maior preço</option>
+      <option value="novos">🆕 Novidades</option>
+      <option value="nome">🔤 Nome (A–Z)</option>
+    </select>
+    <input id="busca" type="search" placeholder="🔍 Buscar bichinho...">
+  </div>
+  <div class="contagem" id="contagem"></div>
+  <div class="grade" id="grade"></div>
+
+  <section class="bloco">
+    <h2>💬 Quem já tem, ama</h2>
+    <div class="depo">
+      <div>Exemplo de depoimento: troque por mensagens reais dos seus clientes (ou prints do WhatsApp/Instagram).<b>— Nome do cliente</b></div>
+      <div>Outro depoimento de exemplo. Fale da qualidade, do acabamento ou da rapidez da entrega.<b>— Nome do cliente</b></div>
+      <div>Mais um espaço para depoimento. Fotos dos clientes com os bichinhos funcionam muito bem aqui.<b>— Nome do cliente</b></div>
+    </div>
+  </section>
+
+  <section class="bloco" id="sobre">
+    <h2>🐾 Quem somos</h2>
+    <div class="sobre">
+      <p>Escreva aqui a história da sua marca: quem faz, desde quando, onde fica o ateliê e o que torna seus bichinhos especiais.</p>
+      <p>Cada peça é impressa em 3D com PLA, revisada à mão e embalada com cuidado antes de sair.</p>
+    </div>
+  </section>
+</div>
+
+<footer>
+  <div class="links">
+    <a href="#" id="lnkVip">💬 Grupo VIP no WhatsApp</a>
+    <a href="#" id="lnkInsta" target="_blank" rel="noopener">📸 Instagram</a>
+    <a href="#sobre">Sobre nós</a>
+    <a href="admin.html">🔒 Área do lojista</a>
+    <a href="#">Política de privacidade</a>
+  </div>
+  <div>© <span id="ano"></span> PopZin · Feito com 💛 e muito filamento</div>
+</footer>
+
+<!-- carrinho -->
+<div class="veu" id="veu"></div>
+<aside class="gaveta" id="gaveta">
+  <div class="g-topo"><h3 id="gTitulo">🛒 Seu carrinho</h3><button class="btn-icone" id="fechar">✕</button></div>
+  <div class="g-itens" id="gItens"></div>
+  <div class="g-rodape" id="gRodape"></div>
+</aside>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   CONFIGURAÇÃO — edite aqui
+   ========================================================= */
+let CONFIG = {
+  loja: "PopZin",
+  whatsapp: "5547999999999",   // seu número com DDI + DDD, só números
+  freteGratisAcima: 120,
+  descontoPix: 0.05,           // 5% de desconto no Pix
+  fretes: { "Sul / Sudeste / Centro-Oeste": 15, "Norte / Nordeste": 30 },
+  linkGrupoVip: "#",
+  instagram: "#",
+};
+
+/* PRODUTOS
+   tipo: animal | dino | mini
+   foto: caminho/URL da imagem (opcional). Sem foto, mostra o emoji.
+   estoque: 0 = esgotado
+   vendidos: usado na ordenação "Mais vendidos"
+   novo: true para aparecer em Novidades e ganhar o selo */
+let PRODUTOS = [
+  {id:1, nome:"Polvo Articulado",    tipo:"animal", colecao:"Mar",      preco:24.9, de:29.9, emoji:"🐙", cor:"#ffe1ec", estoque:12, vendidos:90, destaque:true},
+  {id:2, nome:"Tubarão Flex",        tipo:"animal", colecao:"Mar",      preco:29.9,          emoji:"🦈", cor:"#dff3ff", estoque:8,  vendidos:60},
+  {id:3, nome:"Raposa Dobrável",     tipo:"animal", colecao:"Floresta", preco:27.9,          emoji:"🦊", cor:"#ffead6", estoque:5,  vendidos:45, novo:true},
+  {id:4, nome:"T-Rex Articulado",    tipo:"dino",   colecao:"Especiais",preco:39.9, de:44.9, emoji:"🦖", cor:"#e3f7df", estoque:10, vendidos:120, destaque:true},
+  {id:5, nome:"Braquiossauro",       tipo:"dino",   colecao:"Especiais",preco:42.9,          emoji:"🦕", cor:"#e8f5e3", estoque:0,  vendidos:70},
+  {id:6, nome:"Mini Vaquinha",       tipo:"mini",   colecao:"Fazenda",  preco:12.9,          emoji:"🐄", cor:"#f3f0ea", estoque:30, vendidos:80},
+  {id:7, nome:"Mini Porquinho",      tipo:"mini",   colecao:"Fazenda",  preco:12.9,          emoji:"🐷", cor:"#ffe4ea", estoque:25, vendidos:75},
+  {id:8, nome:"Leão da Savana",      tipo:"animal", colecao:"Savana",   preco:32.9,          emoji:"🦁", cor:"#fff2cf", estoque:6,  vendidos:40},
+  {id:9, nome:"Camelo",              tipo:"animal", colecao:"Deserto",  preco:28.9,          emoji:"🐫", cor:"#f9ecd9", estoque:4,  vendidos:20, novo:true},
+  {id:10,nome:"Gatinho Preto",       tipo:"mini",   colecao:"Halloween",preco:14.9,          emoji:"🐈‍⬛", cor:"#ece6f5", estoque:15, vendidos:55},
+  {id:11,nome:"Rena de Natal",       tipo:"animal", colecao:"Natal",    preco:34.9,          emoji:"🦌", cor:"#ffe0dc", estoque:9,  vendidos:30, novo:true, destaque:true},
+  {id:12,nome:"Dragão Lendário",     tipo:"dino",   colecao:"Lendários",preco:59.9,          emoji:"🐉", cor:"#e0f4ef", estoque:3,  vendidos:65, destaque:true},
+  {id:13,nome:"Tartaruga Marinha",   tipo:"animal", colecao:"Mar",      preco:26.9,          emoji:"🐢", cor:"#dcf3ec", estoque:7,  vendidos:35},
+  {id:14,nome:"Combo Fazendinha (4)",tipo:"mini",   colecao:"Combo",    preco:44.9, de:51.6, emoji:"🐔", cor:"#fff6d6", estoque:10, vendidos:50},
+  {id:15,nome:"Mini Pinguim",        tipo:"mini",   colecao:"Mar",      preco:12.9,          emoji:"🐧", cor:"#e6eef8", estoque:0,  vendidos:28},
+  {id:16,nome:"Coruja da Floresta",  tipo:"animal", colecao:"Floresta", preco:25.9,          emoji:"🦉", cor:"#efe6dc", estoque:11, vendidos:22},
+];
+
+const ATALHOS = [
+  {txt:"🎨 Encomenda personalizada", msg:"Olá! Quero fazer uma encomenda personalizada."},
+  {txt:"🤝 Seja revendedor",          msg:"Olá! Tenho interesse em revender os bichinhos."},
+  {txt:"🎉 Lembrancinhas para festa", msg:"Olá! Quero orçamento de lembrancinhas para festa."},
+  {txt:"📅 Datas especiais",          msg:"Olá! Quero saber sobre os bichinhos de datas especiais."},
+  {txt:"📦 Assinatura", breve:true,   msg:"Olá! Quero ser avisado quando a assinatura mensal abrir."},
+  {txt:"💬 Grupo VIP",                vip:true},
+];
+
+/* ========================================================= */
+const TIPOS = {todos:"Todos", animal:"🐾 Animais", mini:"🧸 Minis", dino:"🦖 Dinos"};
+const $ = s => document.querySelector(s);
+const brl = v => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const wa = msg => `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(msg)}`;
+
+function ler(k,p){ try{ return JSON.parse(localStorage.getItem(k)) ?? p }catch(e){ return p } }
+function salvar(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)) }catch(e){} }
+
+let estado = { tipo:"todos", colecao:"", ordem:"destaque", busca:"", soFavs:false };
+let carrinho = ler("popzin_carrinho", {});   // {id: qtd}
+let favs = ler("popzin_favs", []);
+let regiao = ler("popzin_regiao", "");
+
+/* carrega dados publicados pelo painel (produtos.json / loja.json); se falhar, usa os exemplos acima */
+async function carregarJSON(arq){
+  const r = await fetch(arq + "?v=" + Date.now(), {cache:"no-store"});
+  if(!r.ok) throw new Error(arq);
+  return r.json();
+}
+async function iniciar(){
+  try { CONFIG = {...CONFIG, ...(await carregarJSON("loja.json"))}; } catch(e){}
+  try { const p = await carregarJSON("produtos.json"); if(Array.isArray(p)) PRODUTOS = p; } catch(e){}
+  PRODUTOS.forEach(p => { p.preco=+p.preco||0; p.de=+p.de||0; p.estoque=+p.estoque||0; p.vendidos=+p.vendidos||0; });
+  carrinho = Object.fromEntries(Object.entries(carrinho).filter(([id]) => PRODUTOS.some(p=>p.id==id)));
+  if(!CONFIG.fretes[regiao]) regiao = Object.keys(CONFIG.fretes)[0];
+  montarTela();
+  render();
+}
+
+function montarTela(){
+$("#atalhos").innerHTML = ATALHOS.map(a =>
+  `<a href="${a.vip ? CONFIG.linkGrupoVip : wa(a.msg)}" target="_blank" rel="noopener">${a.txt}${a.breve?'<span class="tag-breve">EM BREVE</span>':''}</a>`).join("");
+$("#lnkVip").href = CONFIG.linkGrupoVip;
+$("#lnkInsta").href = CONFIG.instagram || "#";
+$("#ano").textContent = new Date().getFullYear();
+const colecoes = [...new Set(PRODUTOS.map(p=>p.colecao).filter(Boolean))].sort();
+$("#selColecao").innerHTML = `<option value="">📚 Todas as coleções</option>` + colecoes.map(c=>`<option>${c}</option>`).join("");
+}
+
+/* abas e coleções */
+$("#abas").innerHTML = Object.entries(TIPOS).map(([k,v]) => `<button class="aba" data-tipo="${k}">${v}</button>`).join("");
+$("#abas").onclick = e => { const b=e.target.closest(".aba"); if(!b) return; estado.tipo=b.dataset.tipo; estado.soFavs=false; render(); };
+$("#selColecao").onchange = e => { estado.colecao=e.target.value; render(); };
+$("#selOrdem").onchange = e => { estado.ordem=e.target.value; render(); };
+$("#busca").oninput = e => { estado.busca=e.target.value.toLowerCase(); render(); };
+
+function pixDe(v){ return v*(1-CONFIG.descontoPix); }
+
+function mostrarCarregando(){ $("#grade").innerHTML = `<div class="vazio">Carregando catálogo... 🐾</div>`; }
+
+function render(){
+  document.querySelectorAll(".aba").forEach(b=>b.classList.toggle("ativa", !estado.soFavs && b.dataset.tipo===estado.tipo));
+  let lista = PRODUTOS.filter(p =>
+    (estado.soFavs ? favs.includes(p.id) : true) &&
+    (estado.tipo==="todos" || p.tipo===estado.tipo) &&
+    (!estado.colecao || p.colecao===estado.colecao) &&
+    (!estado.busca || p.nome.toLowerCase().includes(estado.busca)));
+  const ord = {
+    destaque:(a,b)=>(b.destaque?1:0)-(a.destaque?1:0) || b.vendidos-a.vendidos,
+    vendidos:(a,b)=>b.vendidos-a.vendidos,
+    menor:(a,b)=>a.preco-b.preco, maior:(a,b)=>b.preco-a.preco,
+    novos:(a,b)=>(b.novo?1:0)-(a.novo?1:0) || b.id-a.id,
+    nome:(a,b)=>a.nome.localeCompare(b.nome,"pt-BR"),
+  }[estado.ordem];
+  lista.sort((a,b)=>(a.estoque?0:1)-(b.estoque?0:1) || ord(a,b));
+
+  $("#contagem").textContent = estado.soFavs ? `🤍 Seus favoritos: ${lista.length}` : `${lista.length} bichinho(s)`;
+  $("#grade").innerHTML = lista.length ? lista.map(card).join("") :
+    `<div class="vazio">${estado.soFavs ? "Você ainda não favoritou nenhum bichinho 🤍" : "Nenhum bichinho encontrado 🐾"}</div>`;
+  $("#nFavs").textContent = favs.length;
+  atualizaCarrinho();
+}
+
+function card(p){
+  const off = p.de ? Math.round((1-p.preco/p.de)*100) : 0;
+  const esg = !p.estoque;
+  const selo = esg ? `<span class="selo esgot">ESGOTADO</span>` : off ? `<span class="selo">-${off}%</span>` : p.novo ? `<span class="selo novo">NOVO</span>` : "";
+  return `<div class="card">
+    <div class="foto" style="background:${p.cor||'#f5eee9'}">
+      ${p.foto ? `<img src="${p.foto}" alt="${p.nome}" loading="lazy">` : (p.emoji||'🐾')}
+      ${selo}
+      <button class="fav" data-fav="${p.id}" title="Favoritar">${favs.includes(p.id)?"❤️":"🤍"}</button>
+    </div>
+    <div class="info">
+      <div class="colecao">${p.colecao}</div>
+      <div class="nome">${p.nome}</div>
+      <div class="precos">
+        ${p.de?`<span class="de">${brl(p.de)}</span>`:""}<span class="preco">${brl(p.preco)}</span>
+        <div class="pix">${brl(pixDe(p.preco))} no Pix</div>
+      </div>
+      ${esg
+        ? `<a class="btn sec" target="_blank" rel="noopener" href="${wa(`Olá! Me avisa quando o ${p.nome} voltar ao estoque? 🐾`)}">🔔 Avise-me quando voltar</a>`
+        : `<button class="btn" data-add="${p.id}">Adicionar 🛒</button>`}
+    </div>
+  </div>`;
+}
+
+$("#grade").onclick = e => {
+  const f = e.target.closest("[data-fav]"), a = e.target.closest("[data-add]");
+  if(f){ const id=+f.dataset.fav; favs = favs.includes(id) ? favs.filter(x=>x!==id) : [...favs,id]; salvar("popzin_favs",favs); render(); }
+  if(a){ const id=+a.dataset.add, p=PRODUTOS.find(x=>x.id===id);
+    if((carrinho[id]||0) >= p.estoque) return toast("Estoque máximo atingido");
+    carrinho[id]=(carrinho[id]||0)+1; salvar("popzin_carrinho",carrinho); atualizaCarrinho(); toast(`${p.emoji||"🐾"} ${p.nome} no carrinho!`); }
+};
+$("#btnFavs").onclick = () => { estado.soFavs=!estado.soFavs; render(); $("#grade").scrollIntoView({behavior:"smooth",block:"start"}); };
+
+/* carrinho */
+function itensCarrinho(){ return Object.entries(carrinho).map(([id,q])=>({p:PRODUTOS.find(x=>x.id==id),q})).filter(i=>i.p&&i.q>0); }
+function atualizaCarrinho(){
+  const itens = itensCarrinho();
+  $("#nCarrinho").textContent = itens.reduce((s,i)=>s+i.q,0);
+  if(!itens.length){
+    $("#gItens").innerHTML = `<div class="vazio">Seu carrinho está vazio 🐾</div>`;
+    $("#gRodape").innerHTML = ""; return;
+  }
+  $("#gItens").innerHTML = itens.map(({p,q})=>`
+    <div class="item">
+      <div class="mini" style="background:${p.cor||'#f5eee9'}">${p.foto?`<img src="${p.foto}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`:(p.emoji||'🐾')}</div>
+      <div class="txt"><b>${p.nome}</b><br>${brl(p.preco)} un.</div>
+      <div class="qtd"><button data-menos="${p.id}">−</button>${q}<button data-mais="${p.id}">+</button></div>
+    </div>`).join("");
+  const sub = itens.reduce((s,i)=>s+i.p.preco*i.q,0);
+  const gratis = sub >= CONFIG.freteGratisAcima;
+  const frete = gratis ? 0 : CONFIG.fretes[regiao];
+  const falta = CONFIG.freteGratisAcima - sub;
+  const total = sub + frete;
+  $("#gRodape").innerHTML = `
+    <div>${gratis ? "🎉 Você ganhou frete grátis!" : `Faltam <b>${brl(falta)}</b> para frete grátis`}</div>
+    <div class="barra"><i style="width:${Math.min(100,sub/CONFIG.freteGratisAcima*100)}%"></i></div>
+    <label>Região de entrega
+      <select id="selRegiao">${Object.keys(CONFIG.fretes).map(r=>`<option ${r===regiao?"selected":""}>${r}</option>`).join("")}</select>
+    </label>
+    <div class="linha"><span>Subtotal</span><span>${brl(sub)}</span></div>
+    <div class="linha"><span>Frete</span><span>${gratis?"Grátis":brl(frete)}</span></div>
+    <div class="linha total"><span>Total</span><span>${brl(total)}</span></div>
+    <div class="linha pix"><span>No Pix (${CONFIG.descontoPix*100}% off nos produtos)</span><span>${brl(pixDe(sub)+frete)}</span></div>
+    <input id="obs" placeholder="Observação (cor, chaveirinho, presente...)">
+    <a class="btn" id="finalizar" target="_blank" rel="noopener" href="#">Finalizar pelo WhatsApp 💬</a>
+    <button class="btn sec" id="limpar">Esvaziar carrinho</button>`;
+  $("#selRegiao").onchange = e => { regiao=e.target.value; salvar("popzin_regiao",regiao); atualizaCarrinho(); };
+  const montaLink = () => {
+    const linhas = itens.map(({p,q})=>`• ${q}x ${p.nome} — ${brl(p.preco*q)}`).join("\n");
+    const obs = $("#obs").value.trim();
+    $("#finalizar").href = wa(`Olá, ${CONFIG.loja}! Quero fazer este pedido 🐾\n\n${linhas}\n\nSubtotal: ${brl(sub)}\nFrete (${regiao}): ${gratis?"Grátis":brl(frete)}\nTotal: ${brl(total)}\nTotal no Pix: ${brl(pixDe(sub)+frete)}${obs?`\n\nObs.: ${obs}`:""}`);
+  };
+  montaLink(); $("#obs").oninput = montaLink;
+  $("#limpar").onclick = () => { carrinho={}; salvar("popzin_carrinho",carrinho); atualizaCarrinho(); };
+}
+$("#gItens").onclick = e => {
+  const m=e.target.closest("[data-mais]"), n=e.target.closest("[data-menos]");
+  if(m){ const id=+m.dataset.mais, p=PRODUTOS.find(x=>x.id===id); if(carrinho[id]<p.estoque) carrinho[id]++; else toast("Estoque máximo atingido"); }
+  if(n){ const id=+n.dataset.menos; carrinho[id]--; if(carrinho[id]<=0) delete carrinho[id]; }
+  salvar("popzin_carrinho",carrinho); atualizaCarrinho();
+};
+const abrir = v => { $("#gaveta").classList.toggle("aberto",v); $("#veu").classList.toggle("aberto",v); };
+$("#btnCarrinho").onclick = () => abrir(true);
+$("#fechar").onclick = $("#veu").onclick = () => abrir(false);
+
+let tt; function toast(t){ const el=$("#toast"); el.textContent=t; el.classList.add("on"); clearTimeout(tt); tt=setTimeout(()=>el.classList.remove("on"),1800); }
+
+mostrarCarregando();
+iniciar();
+</script>
+</body>
+</html>
