@@ -34,19 +34,6 @@
     "atualizado": 1794329646084
   },
   {
-    "id": 4,
-    "nome": "T-Rex Articulado",
-    "tipo": "dino",
-    "colecao": "Especiais",
-    "preco": 39.9,
-    "de": 44.9,
-    "emoji": "🦖",
-    "cor": "#e3f7df",
-    "estoque": 10,
-    "vendidos": 120,
-    "destaque": true
-  },
-  {
     "id": 5,
     "nome": "Braquiossauro",
     "tipo": "dino",
