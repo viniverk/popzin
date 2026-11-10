@@ -74,6 +74,26 @@
   .contagem{color:var(--suave);font-size:.9rem;margin-bottom:10px}
 
   .grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:40px}
+  /* celular: 2 produtos lado a lado */
+  @media (max-width:640px){
+    .wrap{padding:0 10px}
+    .grade{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .card{border-radius:14px}
+    .card:hover{transform:none}
+    .foto{font-size:3rem}
+    .fav{width:30px;height:30px;font-size:.9rem;top:6px;right:6px}
+    .selo{font-size:.65rem;padding:2px 6px;top:6px;left:6px}
+    .info{padding:9px 9px 10px;gap:2px}
+    .colecao{font-size:.62rem}
+    .nome{font-size:.88rem;line-height:1.2}
+    .de{font-size:.72rem}
+    .preco{font-size:1rem}
+    .pix{font-size:.72rem}
+    .grade .chav{font-size:.68rem;padding:5px 5px;gap:3px;margin-top:6px;letter-spacing:-.01em}
+    .grade .chav b{white-space:nowrap}
+    .grade .chav input{width:14px;height:14px}
+    .grade .btn{padding:8px 4px;font-size:.82rem;border-radius:10px;margin-top:6px}
+  }
   .card{background:var(--card);border-radius:var(--raio);border:1px solid var(--borda);overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,box-shadow .15s}
   .card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(123,47,247,.15)}
   .foto{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:4.5rem}
