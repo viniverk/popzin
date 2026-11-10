@@ -91,6 +91,12 @@
   .pix{font-size:.8rem;color:var(--cor2-esc);font-weight:700}
   .btn{background:var(--cor);color:#fff;border-radius:12px;padding:10px;font-weight:800;margin-top:8px;width:100%;font-size:.92rem}
   .btn:hover{background:var(--cor-esc)}
+  .chav{display:flex;align-items:center;gap:6px;font-size:.85rem;margin-top:8px;padding:7px 9px;border:1px dashed var(--borda);border-radius:10px;cursor:pointer;user-select:none}
+  .chav:has(input:checked){border-color:var(--cor);background:#f3ecff}
+  .chav input{accent-color:var(--cor);width:16px;height:16px}
+  .chav b{margin-left:auto;color:var(--cor)}
+  .chav span{white-space:nowrap}
+  .tag-chav{font-size:.75rem;color:var(--cor);font-weight:700}
   .btn.sec{background:#fff;color:var(--texto);border:1px solid var(--borda)}
   .vazio{grid-column:1/-1;text-align:center;color:var(--suave);padding:40px}
 
@@ -285,7 +291,7 @@ async function iniciar(){
   try { CONFIG = {...CONFIG, ...(await carregarJSON("loja.json"))}; } catch(e){}
   try { const p = await carregarJSON("produtos.json"); if(Array.isArray(p)) PRODUTOS = p; } catch(e){}
   PRODUTOS.forEach(p => { p.preco=+p.preco||0; p.de=+p.de||0; p.estoque=+p.estoque||0; p.vendidos=+p.vendidos||0; });
-  carrinho = Object.fromEntries(Object.entries(carrinho).filter(([id]) => PRODUTOS.some(p=>p.id==id)));
+  carrinho = Object.fromEntries(Object.entries(carrinho).filter(([k]) => PRODUTOS.some(p=>p.id===+String(k).split(":")[0])));
   if(!CONFIG.fretes[regiao]) regiao = Object.keys(CONFIG.fretes)[0];
   montarTela();
   render();
@@ -340,6 +346,13 @@ function render(){
   atualizaCarrinho();
 }
 
+/* chaveiro opcional: preço vem do painel (loja.json → precoChaveiro); produto pode desligar com semChaveiro */
+const precoChav = () => +(CONFIG.precoChaveiro ?? 1) || 0;
+const aceitaChav = p => precoChav() > 0 && !p.semChaveiro;
+const chave = (id, c) => c ? `${id}:c` : `${id}`;
+const lerChave = k => { const [id, c] = String(k).split(":"); return {id:+id, c: c==="c"}; };
+const qtdNoCarrinho = id => Object.entries(carrinho).reduce((s,[k,q]) => s + (lerChave(k).id===id ? q : 0), 0);
+
 function card(p){
   const off = p.de ? Math.round((1-p.preco/p.de)*100) : 0;
   const esg = !p.estoque;
@@ -357,6 +370,7 @@ function card(p){
         ${p.de?`<span class="de">${brl(p.de)}</span>`:""}<span class="preco">${brl(p.preco)}</span>
         <div class="pix">${brl(pixDe(p.preco))} no Pix</div>
       </div>
+      ${!esg && aceitaChav(p) ? `<label class="chav"><input type="checkbox" data-chav="${p.id}"> <span>🔑 Chaveiro</span> <b>+${brl(precoChav())}</b></label>` : ""}
       ${esg
         ? `<a class="btn sec" target="_blank" rel="noopener" href="${wa(`Olá! Me avisa quando o ${p.nome} voltar ao estoque? 🐾`)}">🔔 Avise-me quando voltar</a>`
         : `<button class="btn" data-add="${p.id}">Adicionar 🛒</button>`}
@@ -368,13 +382,18 @@ $("#grade").onclick = e => {
   const f = e.target.closest("[data-fav]"), a = e.target.closest("[data-add]");
   if(f){ const id=+f.dataset.fav; favs = favs.includes(id) ? favs.filter(x=>x!==id) : [...favs,id]; salvar("popzin_favs",favs); render(); }
   if(a){ const id=+a.dataset.add, p=PRODUTOS.find(x=>x.id===id);
-    if((carrinho[id]||0) >= p.estoque) return toast("Estoque máximo atingido");
-    carrinho[id]=(carrinho[id]||0)+1; salvar("popzin_carrinho",carrinho); atualizaCarrinho(); toast(`${p.emoji||"🐾"} ${p.nome} no carrinho!`); }
+    const cb = a.closest(".info").querySelector("[data-chav]"); const c = !!cb?.checked;
+    if(qtdNoCarrinho(id) >= p.estoque) return toast("Estoque máximo atingido");
+    const k = chave(id, c); carrinho[k]=(carrinho[k]||0)+1; salvar("popzin_carrinho",carrinho); atualizaCarrinho();
+    toast(`${p.emoji||"🐾"} ${p.nome}${c?" + chaveiro":""} no carrinho!`); if(cb) cb.checked = false; }
 };
 $("#btnFavs").onclick = () => { estado.soFavs=!estado.soFavs; render(); $("#grade").scrollIntoView({behavior:"smooth",block:"start"}); };
 
 /* carrinho */
-function itensCarrinho(){ return Object.entries(carrinho).map(([id,q])=>({p:PRODUTOS.find(x=>x.id==id),q})).filter(i=>i.p&&i.q>0); }
+function itensCarrinho(){
+  return Object.entries(carrinho).map(([k,q]) => { const {id,c} = lerChave(k); const p = PRODUTOS.find(x=>x.id===id);
+    return {k, p, q, c, un: p ? p.preco + (c ? precoChav() : 0) : 0}; }).filter(i=>i.p&&i.q>0);
+}
 function atualizaCarrinho(){
   const itens = itensCarrinho();
   $("#nCarrinho").textContent = itens.reduce((s,i)=>s+i.q,0);
@@ -382,13 +401,13 @@ function atualizaCarrinho(){
     $("#gItens").innerHTML = `<div class="vazio">Seu carrinho está vazio 🐾</div>`;
     $("#gRodape").innerHTML = ""; return;
   }
-  $("#gItens").innerHTML = itens.map(({p,q})=>`
+  $("#gItens").innerHTML = itens.map(({k,p,q,c,un})=>`
     <div class="item">
       <div class="mini" style="background:${p.cor||'#f5eee9'}">${p.foto?`<img src="${p.foto}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`:(p.emoji||'🐾')}</div>
-      <div class="txt"><b>${p.nome}</b><br>${brl(p.preco)} un.</div>
-      <div class="qtd"><button data-menos="${p.id}">−</button>${q}<button data-mais="${p.id}">+</button></div>
+      <div class="txt"><b>${p.nome}</b>${c?`<br><span class="tag-chav">🔑 com chaveiro</span>`:""}<br>${brl(un)} un.</div>
+      <div class="qtd"><button data-menos="${k}">−</button>${q}<button data-mais="${k}">+</button></div>
     </div>`).join("");
-  const sub = itens.reduce((s,i)=>s+i.p.preco*i.q,0);
+  const sub = itens.reduce((s,i)=>s+i.un*i.q,0);
   const gratis = sub >= CONFIG.freteGratisAcima;
   const frete = gratis ? 0 : CONFIG.fretes[regiao];
   const falta = CONFIG.freteGratisAcima - sub;
@@ -403,12 +422,12 @@ function atualizaCarrinho(){
     <div class="linha"><span>Frete</span><span>${gratis?"Grátis":brl(frete)}</span></div>
     <div class="linha total"><span>Total</span><span>${brl(total)}</span></div>
     <div class="linha pix"><span>No Pix (${CONFIG.descontoPix*100}% off nos produtos)</span><span>${brl(pixDe(sub)+frete)}</span></div>
-    <input id="obs" placeholder="Observação (cor, chaveirinho, presente...)">
+    <input id="obs" placeholder="Observação (cor, presente...)">
     <a class="btn" id="finalizar" target="_blank" rel="noopener" href="#">Finalizar pelo WhatsApp 💬</a>
     <button class="btn sec" id="limpar">Esvaziar carrinho</button>`;
   $("#selRegiao").onchange = e => { regiao=e.target.value; salvar("popzin_regiao",regiao); atualizaCarrinho(); };
   const montaLink = () => {
-    const linhas = itens.map(({p,q})=>`• ${q}x ${p.nome} — ${brl(p.preco*q)}`).join("\n");
+    const linhas = itens.map(({p,q,c,un})=>`• ${q}x ${p.nome}${c?` + chaveiro (+${brl(precoChav())})`:""} — ${brl(un*q)}`).join("\n");
     const obs = $("#obs").value.trim();
     $("#finalizar").href = wa(`Olá, ${CONFIG.loja}! Quero fazer este pedido 🐾\n\n${linhas}\n\nSubtotal: ${brl(sub)}\nFrete (${regiao}): ${gratis?"Grátis":brl(frete)}\nTotal: ${brl(total)}\nTotal no Pix: ${brl(pixDe(sub)+frete)}${obs?`\n\nObs.: ${obs}`:""}`);
   };
@@ -417,8 +436,8 @@ function atualizaCarrinho(){
 }
 $("#gItens").onclick = e => {
   const m=e.target.closest("[data-mais]"), n=e.target.closest("[data-menos]");
-  if(m){ const id=+m.dataset.mais, p=PRODUTOS.find(x=>x.id===id); if(carrinho[id]<p.estoque) carrinho[id]++; else toast("Estoque máximo atingido"); }
-  if(n){ const id=+n.dataset.menos; carrinho[id]--; if(carrinho[id]<=0) delete carrinho[id]; }
+  if(m){ const k=m.dataset.mais, {id}=lerChave(k), p=PRODUTOS.find(x=>x.id===id); if(qtdNoCarrinho(id)<p.estoque) carrinho[k]++; else toast("Estoque máximo atingido"); }
+  if(n){ const k=n.dataset.menos; carrinho[k]--; if(carrinho[k]<=0) delete carrinho[k]; }
   salvar("popzin_carrinho",carrinho); atualizaCarrinho();
 };
 const abrir = v => { $("#gaveta").classList.toggle("aberto",v); $("#veu").classList.toggle("aberto",v); };
