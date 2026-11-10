@@ -234,21 +234,48 @@ const brl = v => (+v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"
 const slug = s => s.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40) || "produto";
 const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
-/* ---------- criptografia ---------- */
-async function chave(user, pass, salt){
-  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(user.trim().toLowerCase()+":"+pass), "PBKDF2", false, ["deriveKey"]);
-  return crypto.subtle.deriveKey({name:"PBKDF2", salt, iterations:310000, hash:"SHA-256"}, base, {name:"AES-GCM", length:256}, false, ["encrypt","decrypt"]);
+/* ---------- criptografia ----------
+   Usa a criptografia nativa do navegador (só existe em https://).
+   Sem https (ex.: domínio novo esperando certificado), carrega crypto-fallback.js
+   (bibliotecas @noble/hashes e @noble/ciphers) — o resultado é idêntico. */
+const ITER = 310000;
+const temNativo = !!(window.crypto && crypto.subtle);
+let nobleProm = null;
+function noble(){
+  if(window.nobleCrypto) return Promise.resolve(window.nobleCrypto);
+  return nobleProm ||= new Promise((ok, erro) => {
+    const s = document.createElement("script"); s.src = "crypto-fallback.js?v=1";
+    s.onload = () => window.nobleCrypto ? ok(window.nobleCrypto) : erro(new Error("Falha ao carregar criptografia"));
+    s.onerror = () => erro(new Error("Falha ao carregar crypto-fallback.js"));
+    document.head.appendChild(s);
+  });
+}
+const senhaBytes = (user, pass) => new TextEncoder().encode(user.trim().toLowerCase()+":"+pass);
+async function chaveBytes(user, pass, salt){
+  if(temNativo){
+    const base = await crypto.subtle.importKey("raw", senhaBytes(user,pass), "PBKDF2", false, ["deriveBits"]);
+    return new Uint8Array(await crypto.subtle.deriveBits({name:"PBKDF2", salt, iterations:ITER, hash:"SHA-256"}, base, 256));
+  }
+  const n = await noble();
+  return n.pbkdf2Async(n.sha256, senhaBytes(user,pass), salt, {c:ITER, dkLen:32, asyncTick:20});
+}
+async function aes(modo, k, iv, dados){
+  if(temNativo){
+    const key = await crypto.subtle.importKey("raw", k, {name:"AES-GCM"}, false, [modo]);
+    return new Uint8Array(await crypto.subtle[modo]({name:"AES-GCM", iv}, key, dados));
+  }
+  const n = await noble(); const c = n.gcm(k, iv);
+  return modo === "encrypt" ? c.encrypt(dados) : c.decrypt(dados);
 }
 async function cifrar(texto, user, pass){
   const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
-  const k = await chave(user, pass, salt);
-  const dados = await crypto.subtle.encrypt({name:"AES-GCM", iv}, k, new TextEncoder().encode(texto));
+  const k = await chaveBytes(user, pass, salt);
+  const dados = await aes("encrypt", k, iv, new TextEncoder().encode(texto));
   return {salt:b64(salt), iv:b64(iv), dados:b64(dados)};
 }
 async function decifrar(c, user, pass){
-  const k = await chave(user, pass, deb64(c.salt));
-  const t = await crypto.subtle.decrypt({name:"AES-GCM", iv:deb64(c.iv)}, k, deb64(c.dados));
-  return new TextDecoder().decode(t);
+  const k = await chaveBytes(user, pass, deb64(c.salt));
+  return new TextDecoder().decode(await aes("decrypt", k, deb64(c.iv), deb64(c.dados)));
 }
 
 /* ---------- API do GitHub ---------- */
@@ -276,6 +303,10 @@ const gravarJSON = (caminho, obj, mensagem) => gravar(caminho, utf8b64(JSON.stri
 /* ---------- início: setup ou login ---------- */
 let cfgCripto = null;
 async function iniciar(){
+  if(location.protocol === "http:" && !/^(localhost|127\.)/.test(location.hostname)){
+    document.querySelectorAll(".caixa-login .sub").forEach(el => el.insertAdjacentHTML("afterend",
+      `<div class="msg">⚠️ Conexão sem cadeado (http). O painel funciona, mas use só em rede confiável até o HTTPS do domínio ficar pronto. <a href="https://${location.host}${location.pathname}">Tentar https</a></div>`));
+  }
   try{
     const r = await fetch(ARQ_CONFIG + "?v=" + Date.now(), {cache:"no-store"});
     if(r.ok){ cfgCripto = await r.json(); }
