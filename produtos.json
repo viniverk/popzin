@@ -18,7 +18,7 @@
   },
   {
     "id": 2,
-    "nome": "Tubarão Flex",
+    "nome": "Mini Caranguejo",
     "tipo": "animal",
     "colecao": "Mar",
     "preco": 11.5,
@@ -31,7 +31,7 @@
     "destaque": true,
     "semChaveiro": false,
     "foto": "img/2-tubarao-flex-mwaxj44c.webp",
-    "atualizado": 1794329625756
+    "atualizado": 1794329646084
   },
   {
     "id": 3,
