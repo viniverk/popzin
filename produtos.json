@@ -6,11 +6,15 @@
     "colecao": "Mar",
     "preco": 24.9,
     "de": 29.9,
-    "emoji": "🐙",
-    "cor": "#ffe1ec",
     "estoque": 12,
     "vendidos": 90,
-    "destaque": true
+    "emoji": "🐙",
+    "cor": "#ffe1ec",
+    "novo": false,
+    "destaque": true,
+    "semChaveiro": false,
+    "foto": "img/1-polvo-articulado-mwaw1k66.webp",
+    "atualizado": 1794327127134
   },
   {
     "id": 2,
