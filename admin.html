@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>PopZin — Painel do lojista</title>
+<link rel="icon" type="image/png" href="img/marca/favicon.png">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{--cor:#ff6b4a;--cor-esc:#e04e2e;--cor2:#2bb3a3;--fundo:#fff8f3;--texto:#3a2e2a;--suave:#8a7a73;--borda:#f1e3da;--erro:#d64545}
+  :root{--cor:#7b2ff7;--cor-esc:#5c1fc7;--cor2:#14b8e8;--fundo:#f6f3ff;--texto:#1d1838;--suave:#77729a;--borda:#e6e0f7;--erro:#d64545}
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Nunito',sans-serif;background:var(--fundo);color:var(--texto);line-height:1.45}
   h1,h2,h3,.logo{font-family:'Baloo 2',cursive}
@@ -23,8 +24,10 @@
   .oculto{display:none!important}
 
   .caixa-login{max-width:400px;margin:8vh auto;background:#fff;border:1px solid var(--borda);border-radius:22px;padding:28px;display:grid;gap:14px}
-  .logo{font-size:1.8rem;color:var(--cor);text-align:center}
-  .logo span{color:var(--cor2)}
+  .logo{text-align:center}
+  .logo img{height:90px}
+  .topo .logo img{height:42px;vertical-align:middle}
+  .topo .logo small{font-family:'Nunito';font-size:.85rem;color:var(--suave);margin-left:6px}
   .sub{color:var(--suave);font-size:.9rem;text-align:center}
   .msg{font-size:.88rem;padding:9px 12px;border-radius:10px;background:#fdecec;color:var(--erro)}
   .msg.ok{background:#e6f6f3;color:#1d7f74}
@@ -77,7 +80,7 @@
 
 <!-- ===== CONFIGURAÇÃO INICIAL (só aparece na primeira vez) ===== -->
 <div id="telaSetup" class="caixa-login oculto">
-  <div class="logo">Pop<span>Zin</span> 🐾</div>
+  <div class="logo"><img src="img/marca/logo-texto.webp" alt="PopZin"></div>
   <div class="sub">Configuração inicial do painel — feita uma vez só.</div>
   <label>Usuário do GitHub (dono do repositório)<input id="sOwner" placeholder="ex.: vinicios"></label>
   <label>Nome do repositório<input id="sRepo" placeholder="ex.: popzin"></label>
@@ -96,7 +99,7 @@
 
 <!-- ===== LOGIN ===== -->
 <form id="telaLogin" class="caixa-login oculto">
-  <div class="logo">Pop<span>Zin</span> 🐾</div>
+  <div class="logo"><img src="img/marca/logo-texto.webp" alt="PopZin"></div>
   <div class="sub">Painel do lojista</div>
   <label>Usuário<input id="lUser" autocomplete="username" required></label>
   <label>Senha<input id="lPass" type="password" autocomplete="current-password" required></label>
@@ -109,7 +112,7 @@
 <div id="telaPainel" class="oculto">
   <header>
     <div class="topo">
-      <div class="logo">Pop<span>Zin</span> · painel</div>
+      <div class="logo"><img src="img/marca/logo-texto.webp" alt="PopZin"><small>painel</small></div>
       <div class="abas">
         <button class="aba ativa" data-aba="produtos">🧸 Produtos</button>
         <button class="aba" data-aba="loja">⚙️ Loja</button>
@@ -179,7 +182,7 @@
       <label>Estoque<input id="pEstoque" type="number" min="0" value="0"></label>
       <label>Vendidos (ordenação)<input id="pVendidos" type="number" min="0" value="0"></label>
       <label>Emoji (sem foto)<input id="pEmoji" maxlength="8" placeholder="🐙"></label>
-      <label>Cor de fundo<input id="pCor" type="color" value="#fff1e8" style="height:42px;padding:4px"></label>
+      <label>Cor de fundo<input id="pCor" type="color" value="#f1ebff" style="height:42px;padding:4px"></label>
     </div>
     <datalist id="listaColecoes"></datalist>
     <div class="checks">
@@ -359,7 +362,7 @@ function abrirModal(p){
   $("#btnExcluir").classList.toggle("oculto", !p);
   $("#pNome").value = p?.nome || ""; $("#pTipo").value = p?.tipo || "animal"; $("#pColecao").value = p?.colecao || "";
   $("#pPreco").value = p?.preco ?? ""; $("#pDe").value = p?.de || ""; $("#pEstoque").value = p?.estoque ?? 0;
-  $("#pVendidos").value = p?.vendidos ?? 0; $("#pEmoji").value = p?.emoji || ""; $("#pCor").value = p?.cor || "#fff1e8";
+  $("#pVendidos").value = p?.vendidos ?? 0; $("#pEmoji").value = p?.emoji || ""; $("#pCor").value = p?.cor || "#f1ebff";
   $("#pNovo").checked = !!p?.novo; $("#pDestaque").checked = !!p?.destaque; $("#pFoto").value = "";
   atualizaPreview();
   $("#modal").classList.remove("oculto");

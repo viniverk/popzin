@@ -3,20 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PopZin — Catálogo</title>
+<title>PopZin — Seu mundo em miniatura</title>
+<meta name="description" content="PopZin — bichinhos articulados e colecionáveis impressos em 3D.">
+<meta name="theme-color" content="#0b1030">
+<link rel="icon" type="image/png" href="img/marca/favicon.png">
+<link rel="apple-touch-icon" href="img/marca/icone-192.png">
+<meta property="og:title" content="PopZin — Seu mundo em miniatura">
+<meta property="og:image" content="img/marca/logo-mascote.webp">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   /* ====== CORES DA MARCA — troque aqui ====== */
   :root{
-    --cor:#ff6b4a;        /* cor principal */
-    --cor-esc:#e04e2e;
-    --cor2:#2bb3a3;       /* cor de apoio */
-    --fundo:#fff8f3;
+    --cor:#7b2ff7;        /* roxo PopZin */
+    --cor-esc:#5c1fc7;
+    --cor2:#14b8e8;       /* azul-ciano do "ZIN" */
+    --cor2-esc:#0784b0;   /* ciano escuro para textos */
+    --amarelo:#ffc21a;
+    --navy:#0b1030;       /* fundo escuro da logo */
+    --fundo:#f6f3ff;
     --card:#ffffff;
-    --texto:#3a2e2a;
-    --suave:#8a7a73;
-    --borda:#f1e3da;
+    --texto:#1d1838;
+    --suave:#77729a;
+    --borda:#e6e0f7;
     --raio:18px;
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -25,13 +34,13 @@
   button{font-family:inherit;cursor:pointer;border:none}
   a{color:inherit}
 
-  .promo{background:var(--cor2);color:#fff;text-align:center;font-size:.85rem;padding:8px 12px;font-weight:700}
+  .promo{background:var(--navy);color:#fff;text-align:center;font-size:.85rem;padding:8px 12px;font-weight:700}
   .promo small{display:block;font-weight:400;opacity:.9}
 
   header{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--borda)}
   .topo{max-width:1200px;margin:auto;display:flex;align-items:center;justify-content:space-between;padding:12px 18px;gap:12px}
-  .logo{font-size:1.7rem;font-weight:800;color:var(--cor);text-decoration:none}
-  .logo span{color:var(--cor2)}
+  .logo{display:flex;align-items:center;text-decoration:none}
+  .logo img{height:52px;width:auto;display:block}
   .acoes{display:flex;gap:8px}
   .btn-icone{background:var(--fundo);border:1px solid var(--borda);border-radius:999px;padding:8px 14px;font-weight:700;font-size:.95rem;color:var(--texto)}
   .btn-icone b{background:var(--cor);color:#fff;border-radius:999px;padding:0 7px;margin-left:4px;font-size:.8rem}
@@ -39,12 +48,15 @@
   .atalhos{max-width:1200px;margin:auto;display:flex;gap:8px;overflow-x:auto;padding:0 18px 12px}
   .atalhos a{white-space:nowrap;text-decoration:none;background:#fff;border:1px solid var(--borda);border-radius:999px;padding:6px 14px;font-size:.85rem;font-weight:600}
   .atalhos a:hover{border-color:var(--cor);color:var(--cor)}
-  .tag-breve{background:var(--cor2);color:#fff;font-size:.65rem;border-radius:6px;padding:1px 5px;margin-left:4px}
+  .tag-breve{background:var(--amarelo);color:var(--navy)!important;color:#fff;font-size:.65rem;border-radius:6px;padding:1px 5px;margin-left:4px}
 
-  .hero{max-width:1200px;margin:24px auto 8px;padding:34px 24px;border-radius:28px;background:linear-gradient(135deg,var(--cor),#ff9a6b);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
-  .hero h1{font-size:clamp(1.8rem,4vw,2.8rem);line-height:1.1}
-  .hero p{opacity:.95;margin-top:6px;max-width:520px}
-  .hero .emojis{font-size:clamp(2.5rem,7vw,4.5rem);letter-spacing:6px}
+  .hero{max-width:1200px;margin:24px auto 8px;padding:26px 34px;border-radius:28px;background:radial-gradient(circle at 85% 40%,#1c1a5a 0%,#07081d 45%,#05061a 100%);color:#fff;display:flex;align-items:center;gap:28px;overflow:hidden;position:relative}
+  .hero img{width:min(300px,38vw);height:auto;flex-shrink:0;border-radius:24px;box-shadow:0 0 0 1px rgba(123,47,247,.35),0 12px 40px rgba(123,47,247,.35)}
+  .hero h1{font-size:clamp(1.7rem,4vw,2.8rem);line-height:1.1}
+  .hero h1 em{font-style:normal;color:var(--amarelo)}
+  .hero p{opacity:.9;margin-top:8px;max-width:520px}
+  .hero .cta{display:inline-block;margin-top:16px;background:var(--amarelo);color:var(--navy);font-weight:800;border-radius:999px;padding:10px 22px;text-decoration:none}
+  @media(max-width:640px){.hero{flex-direction:column;text-align:center;padding:18px}.hero img{width:220px}}
   .wrap{max-width:1200px;margin:auto;padding:0 18px}
 
   .controles{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:22px 0 14px}
@@ -57,7 +69,7 @@
 
   .grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:40px}
   .card{background:var(--card);border-radius:var(--raio);border:1px solid var(--borda);overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,box-shadow .15s}
-  .card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(224,78,46,.12)}
+  .card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(123,47,247,.15)}
   .foto{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:4.5rem}
   .foto img{width:100%;height:100%;object-fit:cover}
   .fav{position:absolute;top:8px;right:8px;background:#fff;border-radius:50%;width:36px;height:36px;font-size:1.1rem;box-shadow:0 2px 6px rgba(0,0,0,.1)}
@@ -70,7 +82,7 @@
   .precos{margin-top:auto;padding-top:6px}
   .de{text-decoration:line-through;color:var(--suave);font-size:.82rem;margin-right:4px}
   .preco{font-weight:800;font-size:1.15rem}
-  .pix{font-size:.8rem;color:var(--cor2);font-weight:700}
+  .pix{font-size:.8rem;color:var(--cor2-esc);font-weight:700}
   .btn{background:var(--cor);color:#fff;border-radius:12px;padding:10px;font-weight:800;margin-top:8px;width:100%;font-size:.92rem}
   .btn:hover{background:var(--cor-esc)}
   .btn.sec{background:#fff;color:var(--texto);border:1px solid var(--borda)}
@@ -81,9 +93,10 @@
   .depo{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
   .depo div{background:#fff;border:1px solid var(--borda);border-radius:var(--raio);padding:18px}
   .depo b{display:block;margin-top:10px;color:var(--cor)}
+  .rodape-logo{height:60px;margin-bottom:12px}
   .sobre{background:#fff;border:1px solid var(--borda);border-radius:var(--raio);padding:22px;display:grid;gap:10px}
 
-  footer{background:var(--texto);color:#f4e9e3;padding:30px 18px;text-align:center;font-size:.9rem}
+  footer{background:var(--navy);color:#f4e9e3;padding:30px 18px;text-align:center;font-size:.9rem}
   footer .links{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:10px}
   footer a{text-decoration:none;opacity:.85}
 
@@ -105,7 +118,7 @@
   .total{font-weight:800;font-size:1.15rem}
   .g-rodape select,.g-rodape input{width:100%;padding:9px;border-radius:10px;border:1px solid var(--borda);font-family:inherit}
   .barra{height:8px;background:var(--fundo);border-radius:99px;overflow:hidden}
-  .barra i{display:block;height:100%;background:var(--cor2)}
+  .barra i{display:block;height:100%;background:linear-gradient(90deg,var(--cor2),var(--cor))}
   a.btn{display:block;text-align:center;text-decoration:none}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--texto);color:#fff;padding:10px 18px;border-radius:999px;font-weight:700;transition:.25s;z-index:60}
   .toast.on{transform:translateX(-50%) translateY(0)}
@@ -120,7 +133,7 @@
 
 <header>
   <div class="topo">
-    <a class="logo" href="#">Pop<span>Zin</span> 🐾</a>
+    <a class="logo" href="#"><img src="img/marca/logo-texto.webp" alt="PopZin"></a>
     <div class="acoes">
       <button class="btn-icone" id="btnFavs">🤍 <span id="nFavs">0</span></button>
       <button class="btn-icone" id="btnCarrinho">🛒 Carrinho <b id="nCarrinho">0</b></button>
@@ -131,14 +144,15 @@
 
 <div class="wrap">
   <div class="hero">
+    <img src="img/marca/logo-mascote.webp" alt="PopZin — Seu mundo em miniatura">
     <div>
-      <h1>Bichinhos articulados<br>impressos em 3D</h1>
-      <p>Colecionáveis que mexem, dobram e encantam. Feitos um a um, com carinho, para colecionar ou presentear.</p>
+      <h1>Seu mundo em <em>miniatura</em></h1>
+      <p>Bichinhos articulados e colecionáveis impressos em 3D. Feitos um a um, com carinho, para colecionar ou presentear.</p>
+      <a class="cta" href="#catalogo">Ver catálogo 👇</a>
     </div>
-    <div class="emojis">🦖🐙🦊</div>
   </div>
 
-  <div class="controles">
+  <div class="controles" id="catalogo">
     <div class="abas" id="abas"></div>
     <select id="selColecao"></select>
     <select id="selOrdem">
@@ -173,6 +187,7 @@
 </div>
 
 <footer>
+  <img class="rodape-logo" src="img/marca/logo-texto.webp" alt="PopZin">
   <div class="links">
     <a href="#" id="lnkVip">💬 Grupo VIP no WhatsApp</a>
     <a href="#" id="lnkInsta" target="_blank" rel="noopener">📸 Instagram</a>
