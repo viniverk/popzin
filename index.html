@@ -97,6 +97,8 @@
   .chav b{margin-left:auto;color:var(--cor)}
   .chav span{white-space:nowrap}
   .tag-chav{font-size:.75rem;color:var(--cor);font-weight:700}
+  .chav-mini{margin-top:6px;padding:4px 8px;font-size:.78rem;gap:5px}
+  .chav-mini input{width:14px;height:14px}
   .btn.sec{background:#fff;color:var(--texto);border:1px solid var(--borda)}
   .vazio{grid-column:1/-1;text-align:center;color:var(--suave);padding:40px}
 
@@ -385,7 +387,7 @@ $("#grade").onclick = e => {
     const cb = a.closest(".info").querySelector("[data-chav]"); const c = !!cb?.checked;
     if(qtdNoCarrinho(id) >= p.estoque) return toast("Estoque máximo atingido");
     const k = chave(id, c); carrinho[k]=(carrinho[k]||0)+1; salvar("popzin_carrinho",carrinho); atualizaCarrinho();
-    toast(`${p.emoji||"🐾"} ${p.nome}${c?" + chaveiro":""} no carrinho!`); if(cb) cb.checked = false; }
+    toast(`${p.emoji||"🐾"} ${p.nome}${c?" + chaveiro":""} no carrinho!`); }
 };
 $("#btnFavs").onclick = () => { estado.soFavs=!estado.soFavs; render(); $("#grade").scrollIntoView({behavior:"smooth",block:"start"}); };
 
@@ -404,7 +406,7 @@ function atualizaCarrinho(){
   $("#gItens").innerHTML = itens.map(({k,p,q,c,un})=>`
     <div class="item">
       <div class="mini" style="background:${p.cor||'#f5eee9'}">${p.foto?`<img src="${p.foto}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`:(p.emoji||'🐾')}</div>
-      <div class="txt"><b>${p.nome}</b>${c?`<br><span class="tag-chav">🔑 com chaveiro</span>`:""}<br>${brl(un)} un.</div>
+      <div class="txt"><b>${p.nome}</b><br>${brl(un)} un.${aceitaChav(p)?`<label class="chav chav-mini"><input type="checkbox" data-trocachav="${k}" ${c?"checked":""}> <span>🔑 Chaveiro</span> <b>+${brl(precoChav())}</b></label>`:""}</div>
       <div class="qtd"><button data-menos="${k}">−</button>${q}<button data-mais="${k}">+</button></div>
     </div>`).join("");
   const sub = itens.reduce((s,i)=>s+i.un*i.q,0);
@@ -434,8 +436,26 @@ function atualizaCarrinho(){
   montaLink(); $("#obs").oninput = montaLink;
   $("#limpar").onclick = () => { carrinho={}; salvar("popzin_carrinho",carrinho); atualizaCarrinho(); };
 }
+/* troca uma linha do carrinho entre "com" e "sem" chaveiro (junta se já existir a outra) */
+function trocarChaveiro(k, comChav){
+  const {id} = lerChave(k), destino = chave(id, comChav);
+  if(destino === k || !carrinho[k]) return;
+  carrinho[destino] = (carrinho[destino]||0) + carrinho[k]; delete carrinho[k];
+  salvar("popzin_carrinho",carrinho); atualizaCarrinho();
+}
+$("#gItens").onchange = e => { const t = e.target.closest("[data-trocachav]"); if(t) trocarChaveiro(t.dataset.trocachav, t.checked); };
+/* marcar/desmarcar no card: se o produto já está no carrinho só na outra versão, atualiza o carrinho */
+$("#grade").onchange = e => {
+  const t = e.target.closest("[data-chav]"); if(!t) return;
+  const id = +t.dataset.chav, linhas = Object.keys(carrinho).filter(k => lerChave(k).id === id);
+  if(linhas.length === 1 && lerChave(linhas[0]).c !== t.checked){
+    trocarChaveiro(linhas[0], t.checked);
+    toast(t.checked ? "🔑 Chaveiro adicionado ao item do carrinho" : "Chaveiro removido do item do carrinho");
+  }
+};
 $("#gItens").onclick = e => {
   const m=e.target.closest("[data-mais]"), n=e.target.closest("[data-menos]");
+  if(!m && !n) return;
   if(m){ const k=m.dataset.mais, {id}=lerChave(k), p=PRODUTOS.find(x=>x.id===id); if(qtdNoCarrinho(id)<p.estoque) carrinho[k]++; else toast("Estoque máximo atingido"); }
   if(n){ const k=n.dataset.menos; carrinho[k]--; if(carrinho[k]<=0) delete carrinho[k]; }
   salvar("popzin_carrinho",carrinho); atualizaCarrinho();
