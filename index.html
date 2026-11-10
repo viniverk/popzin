@@ -117,6 +117,7 @@
   .chav b{margin-left:auto;color:var(--cor)}
   .chav span{white-space:nowrap}
   .tag-chav{font-size:.75rem;color:var(--cor);font-weight:700}
+  .limpar{background:none;color:var(--suave);font-size:.82rem;text-decoration:underline;padding:2px}
   .chav-mini{margin-top:6px;padding:4px 8px;font-size:.78rem;gap:5px}
   .chav-mini input{width:14px;height:14px}
   .btn.sec{background:#fff;color:var(--texto);border:1px solid var(--borda)}
@@ -407,7 +408,7 @@ $("#grade").onclick = e => {
     const cb = a.closest(".info").querySelector("[data-chav]"); const c = !!cb?.checked;
     if(qtdNoCarrinho(id) >= p.estoque) return toast("Estoque máximo atingido");
     const k = chave(id, c); carrinho[k]=(carrinho[k]||0)+1; salvar("popzin_carrinho",carrinho); atualizaCarrinho();
-    toast(`${p.emoji||"🐾"} ${p.nome}${c?" + chaveiro":""} no carrinho!`); }
+    abrir(true); }
 };
 $("#btnFavs").onclick = () => { estado.soFavs=!estado.soFavs; render(); $("#grade").scrollIntoView({behavior:"smooth",block:"start"}); };
 
@@ -446,7 +447,9 @@ function atualizaCarrinho(){
     <div class="linha pix"><span>No Pix (${CONFIG.descontoPix*100}% off nos produtos)</span><span>${brl(pixDe(sub)+frete)}</span></div>
     <input id="obs" placeholder="Observação (cor, presente...)">
     <a class="btn" id="finalizar" target="_blank" rel="noopener" href="#">Finalizar pelo WhatsApp 💬</a>
-    <button class="btn sec" id="limpar">Esvaziar carrinho</button>`;
+    <button class="btn sec" id="continuar">← Continuar comprando</button>
+    <button class="limpar" id="limpar">Esvaziar carrinho</button>`;
+  $("#continuar").onclick = () => abrir(false);
   $("#selRegiao").onchange = e => { regiao=e.target.value; salvar("popzin_regiao",regiao); atualizaCarrinho(); };
   const montaLink = () => {
     const linhas = itens.map(({p,q,c,un})=>`• ${q}x ${p.nome}${c?` + chaveiro (+${brl(precoChav())})`:""} — ${brl(un*q)}`).join("\n");
