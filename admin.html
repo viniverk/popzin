@@ -65,6 +65,20 @@
   .rodape-modal{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
 
   .cartao{background:#fff;border:1px solid var(--borda);border-radius:18px;padding:20px;display:grid;gap:14px;max-width:720px}
+  .cartao.larga{max-width:none;margin-bottom:14px;gap:10px}
+  .cartao h3{font-size:1.15rem}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+  .kpi{background:#fff;border:1px solid var(--borda);border-radius:16px;padding:14px}
+  .kpi small{display:block;font-size:.75rem;color:var(--suave);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+  .kpi b{font-size:1.5rem;font-family:'Baloo 2',cursive;line-height:1.2}
+  .kpi span{display:block;font-size:.75rem;color:var(--suave)}
+  .duas{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+  .rank{display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:.9rem;align-items:center}
+  .rank .bar{grid-column:1/-1;height:6px;border-radius:99px;background:var(--fundo);overflow:hidden;margin-bottom:6px}
+  .rank .bar i{display:block;height:100%;background:var(--cor)}
+  .st{border-radius:8px;padding:4px 6px;font-size:.82rem;width:auto}
+  .st-novo{background:#fff4d6}.st-pago{background:#e2f6ee}.st-enviado{background:#e3f0ff}.st-cancelado{background:#f4f1f1;color:#999}
+  .vazio-v{color:var(--suave);font-size:.9rem;padding:10px 0}
   .fretes-linha{display:grid;grid-template-columns:1fr 120px 40px;gap:8px}
 
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(90px);background:var(--texto);color:#fff;padding:11px 20px;border-radius:999px;font-weight:700;transition:.25s;z-index:60;max-width:90vw;text-align:center}
@@ -115,6 +129,7 @@
       <div class="logo"><img src="img/marca/logo-texto.webp" alt="PopZin"><small>painel</small></div>
       <div class="abas">
         <button class="aba ativa" data-aba="produtos">🧸 Produtos</button>
+        <button class="aba oculto" data-aba="vendas" id="abaBtnVendas">📊 Vendas</button>
         <button class="aba" data-aba="loja">⚙️ Loja</button>
       </div>
       <div style="display:flex;gap:8px">
@@ -138,6 +153,29 @@
       </table>
     </section>
 
+    <section id="abaVendas" class="oculto">
+      <div class="barra">
+        <select id="vPeriodo" style="width:auto">
+          <option value="1">Hoje</option><option value="7" selected>Últimos 7 dias</option>
+          <option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option>
+        </select>
+        <button class="btn sec" id="vAtualizar">↻ Atualizar</button>
+        <span class="ajuda">Suas próprias visitas (logado no painel) não são contadas.</span>
+      </div>
+      <div class="kpis" id="vKpis"></div>
+      <div class="cartao larga"><h3>Visitas e pedidos por dia</h3><div id="vGrafico"></div></div>
+      <div class="duas">
+        <div class="cartao larga"><h3>🏆 Mais pedidos</h3><div id="vTopPedidos"></div></div>
+        <div class="cartao larga"><h3>🛒 Mais colocados no carrinho</h3><div id="vTopCarrinho"></div></div>
+      </div>
+      <div class="cartao larga"><h3>📍 De onde vêm as visitas</h3><div id="vOrigens"></div></div>
+      <div class="cartao larga">
+        <h3>🧾 Pedidos enviados pelo WhatsApp</h3>
+        <div class="ajuda">Marque o andamento de cada pedido. O <b>faturamento</b> conta só os marcados como <b>pago</b> ou <b>enviado</b>.</div>
+        <div id="vPedidos" style="overflow-x:auto"></div>
+      </div>
+    </section>
+
     <section id="abaLoja" class="oculto">
       <div class="cartao">
         <h3>Configurações da loja</h3>
@@ -149,6 +187,7 @@
           <label>Link do grupo VIP<input id="cVip"></label>
           <label>Link do Instagram<input id="cInsta"></label>
           <label>Preço do chaveiro (R$) — 0 desliga<input id="cChav" type="number" step="0.01" min="0"></label>
+          <label>Prazo das encomendas personalizadas<input id="cPrazo" placeholder="ex.: 7 a 10 dias úteis"></label>
         </div>
         <div style="display:grid;gap:10px;background:var(--fundo);border-radius:14px;padding:14px">
           <b>Faixa do topo do site</b>
@@ -196,6 +235,8 @@
       <label>Preço "de" (opcional)<input id="pDe" type="number" step="0.01" min="0"></label>
       <label>Estoque<input id="pEstoque" type="number" min="0" value="0"></label>
       <label>Vendidos (ordenação)<input id="pVendidos" type="number" min="0" value="0"></label>
+      <label>🔥 Combo: a partir de (un.)<input id="pPromoQtd" type="number" min="0" step="1" placeholder="ex.: 3 (vazio = sem combo)"></label>
+      <label>🔥 Preço no combo (R$ cada)<input id="pPromoPreco" type="number" min="0" step="0.01" placeholder="ex.: 9.90"></label>
       <label>Emoji (sem foto)<input id="pEmoji" maxlength="8" placeholder="🐙"></label>
       <label>Cor de fundo<input id="pCor" type="color" value="#f1ebff" style="height:42px;padding:4px"></label>
     </div>
@@ -217,7 +258,7 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=2"></script>
+<script src="config.js?v=3"></script>
 <script>
 /* =========================================================
    Painel PopZin — salva direto no repositório via API do GitHub.
@@ -399,6 +440,7 @@ async function iniciar(){
     $("#lUserLbl").textContent = "E-mail"; $("#lUser").type = "email"; $("#lUser").autocomplete = "email";
     $("#avisoTempo").textContent = "As alterações aparecem no site na hora (é só atualizar a página da loja).";
     $("#fotoArquivo").classList.add("oculto"); $("#fotoLink").classList.remove("oculto");
+    $("#abaBtnVendas").classList.remove("oculto");
     fbSessao = lerSessaoFB();
     if(fbSessao){ try{ await fbToken(); return entrarNoPainel(); }catch(e){ gravarSessaoFB(null); } }
     mostrar("#telaLogin"); return;
@@ -479,6 +521,8 @@ document.querySelectorAll(".aba").forEach(b => b.onclick = () => {
   document.querySelectorAll(".aba").forEach(x=>x.classList.toggle("ativa", x===b));
   $("#abaProdutos").classList.toggle("oculto", b.dataset.aba!=="produtos");
   $("#abaLoja").classList.toggle("oculto", b.dataset.aba!=="loja");
+  $("#abaVendas").classList.toggle("oculto", b.dataset.aba!=="vendas");
+  if(b.dataset.aba==="vendas") carregarVendas();
 });
 
 /* ---------- produtos ---------- */
@@ -506,7 +550,7 @@ function abrirModal(p){
   $("#btnExcluir").classList.toggle("oculto", !p);
   $("#pNome").value = p?.nome || ""; $("#pTipo").value = p?.tipo || "animal"; $("#pColecao").value = p?.colecao || "";
   $("#pPreco").value = p?.preco ?? ""; $("#pDe").value = p?.de || ""; $("#pEstoque").value = p?.estoque ?? 0;
-  $("#pVendidos").value = p?.vendidos ?? 0; $("#pEmoji").value = p?.emoji || ""; $("#pCor").value = p?.cor || "#f1ebff";
+  $("#pVendidos").value = p?.vendidos ?? 0; $("#pPromoQtd").value = p?.promoQtd || ""; $("#pPromoPreco").value = p?.promoPreco || ""; $("#pEmoji").value = p?.emoji || ""; $("#pCor").value = p?.cor || "#f1ebff";
   $("#pChav").checked = !p?.semChaveiro; $("#pNovo").checked = !!p?.novo; $("#pDestaque").checked = !!p?.destaque; $("#pFoto").value = ""; $("#pFotoUrl").value = p?.foto || "";
   atualizaPreview();
   $("#modal").classList.remove("oculto");
@@ -555,7 +599,7 @@ $("#formProduto").onsubmit = async e => {
     const id = editando ? editando.id : (Math.max(0, ...produtos.map(p=>+p.id||0)) + 1);
     const p = {
       id, nome:$("#pNome").value.trim(), tipo:$("#pTipo").value, colecao:$("#pColecao").value.trim(),
-      preco:+$("#pPreco").value||0, de:+$("#pDe").value||0, estoque:+$("#pEstoque").value||0, vendidos:+$("#pVendidos").value||0,
+      preco:+$("#pPreco").value||0, de:+$("#pDe").value||0, estoque:+$("#pEstoque").value||0, vendidos:+$("#pVendidos").value||0, promoQtd:Math.floor(+$("#pPromoQtd").value||0), promoPreco:+$("#pPromoPreco").value||0,
       emoji:$("#pEmoji").value.trim(), cor:$("#pCor").value, novo:$("#pNovo").checked, destaque:$("#pDestaque").checked, semChaveiro:!$("#pChav").checked,
       foto: editando?.foto || "", atualizado: Date.now()
     };
@@ -566,6 +610,7 @@ $("#formProduto").onsubmit = async e => {
       p.foto = await BD.enviarFoto(novaFoto.blob, `${id}-${slug(p.nome)}-${Date.now().toString(36)}.${novaFoto.ext}`);
     } else if(removerFoto) p.foto = "";
     if(!p.de || p.de <= p.preco) p.de = 0;
+    if(p.promoQtd < 2 || !p.promoPreco || p.promoPreco >= p.preco){ if(p.promoQtd || p.promoPreco) toast("Combo ignorado: use 2+ unidades e preço menor que o normal.", true); p.promoQtd = 0; p.promoPreco = 0; }
 
     b.textContent = "Atualizando catálogo...";
     await BD.salvarProduto(p);
@@ -610,6 +655,102 @@ function mostrarImportar(){
   };
 }
 
+/* ---------- 📊 Vendas: lê eventos (visitas/carrinho) e pedidos do Firestore ---------- */
+const STATUS = {novo:"🟡 Novo", pago:"🟢 Pago", enviado:"📦 Enviado", cancelado:"⚪ Cancelado"};
+async function fsConsulta(colecao, desde){
+  const r = await fetch(`${FS}:runQuery`, {method:"POST", headers:{Authorization:`Bearer ${await fbToken()}`, "Content-Type":"application/json"},
+    body:JSON.stringify({structuredQuery:{from:[{collectionId:colecao}],
+      where:{fieldFilter:{field:{fieldPath:"criado"}, op:"GREATER_THAN_OR_EQUAL", value:{timestampValue:desde.toISOString()}}},
+      orderBy:[{field:{fieldPath:"criado"}, direction:"DESCENDING"}], limit:10000}})});
+  if(r.status===403) throw new Error("Sem permissão para ler os números — publique as regras novas do Firestore.");
+  if(!r.ok) throw new Error(`Firebase ${r.status}`);
+  return (await r.json()).filter(x => x.document).map(({document:d}) => {
+    let json = {}; try{ json = JSON.parse(d.fields.json?.stringValue || "{}"); }catch(e){}
+    return {id:d.name.split("/").pop(), criado:new Date(d.fields.criado?.timestampValue || d.createTime),
+            tipo:d.fields.tipo?.stringValue, status:d.fields.status?.stringValue || "novo", ...json};
+  });
+}
+let vendasCache = null;
+const diaKey = d => d.toLocaleDateString("sv-SE", {timeZone:"America/Sao_Paulo"});   // AAAA-MM-DD no fuso de Brasília
+async function carregarVendas(){
+  const dias = +$("#vPeriodo").value;
+  const desde = new Date(); desde.setHours(0,0,0,0); desde.setDate(desde.getDate() - (dias-1));
+  $("#vKpis").innerHTML = `<div class="vazio-v">Carregando...</div>`;
+  try{
+    const [eventos, pedidos] = await Promise.all([fsConsulta("eventos", desde), fsConsulta("pedidos", desde)]);
+    vendasCache = {eventos, pedidos, dias, desde};
+    desenharVendas();
+  }catch(e){ $("#vKpis").innerHTML = `<div class="msg">${esc(e.message)}</div>`; }
+}
+$("#vPeriodo").onchange = carregarVendas;
+$("#vAtualizar").onclick = carregarVendas;
+
+function rankHTML(pares, fmt = v => v){
+  if(!pares.length) return `<div class="vazio-v">Nada ainda no período.</div>`;
+  const max = pares[0][1] || 1;
+  return `<div class="rank">${pares.slice(0,8).map(([n,v]) => `<span>${esc(n)}</span><b>${fmt(v)}</b><div class="bar"><i style="width:${v/max*100}%"></i></div>`).join("")}</div>`;
+}
+function desenharVendas(){
+  const {eventos, pedidos, dias, desde} = vendasCache;
+  const visitas = eventos.filter(e => e.tipo === "visita"), carrinhos = eventos.filter(e => e.tipo === "carrinho");
+  const validos = pedidos.filter(p => p.status !== "cancelado");
+  const confirmados = pedidos.filter(p => p.status === "pago" || p.status === "enviado");
+  const fat = confirmados.reduce((s,p) => s + (+p.total||0), 0);
+  const ticket = confirmados.length ? fat/confirmados.length : (validos.length ? validos.reduce((s,p)=>s+(+p.total||0),0)/validos.length : 0);
+  const conv = visitas.length ? validos.length/visitas.length*100 : 0;
+  const kpi = (t, v, s="") => `<div class="kpi"><small>${t}</small><b>${v}</b>${s?`<span>${s}</span>`:""}</div>`;
+  $("#vKpis").innerHTML =
+    kpi("Visitas", visitas.length, `${visitas.filter(v=>v.celular).length} pelo celular`) +
+    kpi("Adições ao carrinho", carrinhos.length) +
+    kpi("Pedidos no WhatsApp", validos.length, `${brl(validos.reduce((s,p)=>s+(+p.total||0),0))} em pedidos`) +
+    kpi("Conversão", conv.toFixed(1).replace(".",",") + "%", "pedidos ÷ visitas") +
+    kpi("Confirmados", confirmados.length, "pagos ou enviados") +
+    kpi("Faturamento", brl(fat), "só confirmados") +
+    kpi("Ticket médio", brl(ticket), confirmados.length ? "dos confirmados" : "dos pedidos");
+
+  // gráfico por dia (barras = visitas, pontos = pedidos)
+  const dd = []; for(let i=0;i<dias;i++){ const d = new Date(desde); d.setDate(d.getDate()+i); dd.push(diaKey(d)); }
+  const porDia = (lista) => { const m = Object.fromEntries(dd.map(k=>[k,0])); lista.forEach(x => { const k = diaKey(x.criado); if(k in m) m[k]++; }); return dd.map(k=>m[k]); };
+  const vis = porDia(visitas), ped = porDia(validos), max = Math.max(1, ...vis, ...ped);
+  const W = 720, H = 200, pad = 26, bw = (W - pad*2) / dd.length;
+  const y = v => H - 24 - v/max*(H-50);
+  const passo = Math.ceil(dd.length/10);
+  $("#vGrafico").innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="Visitas e pedidos por dia">
+    <line x1="${pad}" x2="${W-pad}" y1="${H-24}" y2="${H-24}" stroke="#e6e0f7"/>
+    ${vis.map((v,i) => `<rect x="${pad+i*bw+bw*.15}" y="${y(v)}" width="${bw*.7}" height="${H-24-y(v)}" rx="3" fill="#cdb8fb"><title>${dd[i].slice(8)}/${dd[i].slice(5,7)}: ${v} visita(s), ${ped[i]} pedido(s)</title></rect>`).join("")}
+    ${ped.map((v,i) => v ? `<circle cx="${pad+i*bw+bw/2}" cy="${y(v)}" r="5" fill="#7b2ff7" stroke="#fff" stroke-width="2"><title>${v} pedido(s)</title></circle>` : "").join("")}
+    ${dd.map((k,i) => i%passo===0 ? `<text x="${pad+i*bw+bw/2}" y="${H-8}" font-size="11" text-anchor="middle" fill="#77729a">${k.slice(8)}/${k.slice(5,7)}</text>` : "").join("")}
+  </svg>
+  <div class="ajuda"><span style="color:#cdb8fb">■</span> visitas &nbsp; <span style="color:#7b2ff7">●</span> pedidos</div>`;
+
+  // rankings
+  const soma = {}; validos.forEach(p => (p.itens||[]).forEach(i => soma[i.nome] = (soma[i.nome]||0) + (+i.q||0)));
+  $("#vTopPedidos").innerHTML = rankHTML(Object.entries(soma).sort((a,b)=>b[1]-a[1]), v => `${v} un.`);
+  const cc = {}; carrinhos.forEach(e => cc[e.nome||`#${e.id}`] = (cc[e.nome||`#${e.id}`]||0) + 1);
+  $("#vTopCarrinho").innerHTML = rankHTML(Object.entries(cc).sort((a,b)=>b[1]-a[1]), v => `${v}×`);
+  const og = {}; visitas.forEach(v => og[v.origem||"direto"] = (og[v.origem||"direto"]||0) + 1);
+  $("#vOrigens").innerHTML = rankHTML(Object.entries(og).sort((a,b)=>b[1]-a[1]), v => `${v}`);
+
+  // pedidos
+  $("#vPedidos").innerHTML = pedidos.length ? `<table><thead><tr><th>Quando</th><th>Itens</th><th>Total</th><th>Região</th><th>Andamento</th></tr></thead><tbody>${
+    pedidos.map(p => `<tr>
+      <td>${p.criado.toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",timeZone:"America/Sao_Paulo"})}</td>
+      <td>${(p.itens||[]).map(i => `${i.q}× ${esc(i.nome)}${i.chaveiro?" 🔑":""}`).join("<br>")}${p.obs?`<br><small style="color:var(--suave)">“${esc(p.obs)}”</small>`:""}</td>
+      <td><b>${brl(p.total)}</b><br><small style="color:var(--suave)">Pix ${brl(p.totalPix)}</small></td>
+      <td><small>${esc(p.regiao||"")}${p.freteGratis?"<br>frete grátis":""}</small></td>
+      <td><select class="st st-${p.status}" data-pedido="${p.id}">${Object.entries(STATUS).map(([k,v])=>`<option value="${k}" ${k===p.status?"selected":""}>${v}</option>`).join("")}</select></td>
+    </tr>`).join("")}</tbody></table>` : `<div class="vazio-v">Nenhum pedido no período.</div>`;
+}
+$("#vPedidos").onchange = async e => {
+  const s = e.target.closest("[data-pedido]"); if(!s) return;
+  const id = s.dataset.pedido, novo = s.value;
+  try{
+    await fs(`pedidos/${id}?updateMask.fieldPaths=status`, {method:"PATCH", body:JSON.stringify({fields:{status:{stringValue:novo}}})});
+    const p = vendasCache.pedidos.find(x => x.id === id); if(p) p.status = novo;
+    desenharVendas(); toast("Pedido atualizado ✅");
+  }catch(err){ toast(err.message, true); }
+};
+
 /* ---------- configurações da loja ---------- */
 function linhaFrete(nome="", valor=""){
   const d = document.createElement("div"); d.className = "fretes-linha";
@@ -620,7 +761,7 @@ function linhaFrete(nome="", valor=""){
 function preencherLoja(){
   $("#cLoja").value = loja.loja||""; $("#cWhats").value = loja.whatsapp||""; $("#cFreteGratis").value = loja.freteGratisAcima ?? 120;
   $("#cPix").value = Math.round((loja.descontoPix||0)*1000)/10; $("#cVip").value = loja.linkGrupoVip||""; $("#cInsta").value = loja.instagram||"";
-  $("#cChav").value = loja.precoChaveiro ?? 1; $("#cFaixaTitulo").value = loja.faixaTitulo||""; $("#cFaixaSub").value = loja.faixaSub||""; $("#cFaixaOcultar").checked = !!loja.faixaOcultar;
+  $("#cChav").value = loja.precoChaveiro ?? 1; $("#cPrazo").value = loja.prazoEncomenda || ""; $("#cFaixaTitulo").value = loja.faixaTitulo||""; $("#cFaixaSub").value = loja.faixaSub||""; $("#cFaixaOcultar").checked = !!loja.faixaOcultar;
   $("#fretes").innerHTML = ""; Object.entries(loja.fretes||{}).forEach(([n,v]) => linhaFrete(n,v));
 }
 $("#btnAddFrete").onclick = () => linhaFrete();
@@ -631,7 +772,7 @@ $("#btnSalvarLoja").onclick = async () => {
   if(!Object.keys(fretes).length){ b.disabled=false; return toast("Cadastre pelo menos uma região de frete.", true); }
   loja = { loja:$("#cLoja").value.trim()||"PopZin", whatsapp:$("#cWhats").value.replace(/\D/g,""), freteGratisAcima:+$("#cFreteGratis").value||0,
            descontoPix:(+$("#cPix").value||0)/100, fretes, linkGrupoVip:$("#cVip").value.trim()||"#", instagram:$("#cInsta").value.trim()||"#",
-           faixaTitulo:$("#cFaixaTitulo").value.trim(), faixaSub:$("#cFaixaSub").value.trim(), faixaOcultar:$("#cFaixaOcultar").checked, precoChaveiro:+$("#cChav").value||0 };
+           faixaTitulo:$("#cFaixaTitulo").value.trim(), faixaSub:$("#cFaixaSub").value.trim(), faixaOcultar:$("#cFaixaOcultar").checked, precoChaveiro:+$("#cChav").value||0, prazoEncomenda:$("#cPrazo").value.trim() };
   try{ await BD.salvarLoja(loja); toast(modoFB ? "Configurações salvas — já valem no site ✅" : "Configurações salvas ✅"); }
   catch(err){ toast(err.message, true); }
   b.disabled = false;

@@ -117,6 +117,16 @@
   .chav b{margin-left:auto;color:var(--cor)}
   .chav span{white-space:nowrap}
   .tag-chav{font-size:.75rem;color:var(--cor);font-weight:700}
+  .combo{margin-top:6px;font-size:.8rem;background:#fff4d6;color:#7a4a00;border-radius:8px;padding:4px 8px;font-weight:600}
+  .tag-combo{font-size:.72rem;background:#fff4d6;color:#7a4a00;border-radius:6px;padding:1px 6px;font-weight:700}
+  .dica-combo{font-size:.75rem;color:#7a4a00;margin-top:2px}
+  .tag-prazo{background:var(--fundo);border:1px solid var(--borda);color:var(--suave);font-size:.7rem;border-radius:6px;padding:1px 6px;margin-left:6px;font-weight:700}
+  #barraFrete{position:fixed;left:50%;bottom:14px;transform:translate(-50%,140%);width:min(520px,calc(100% - 20px));background:#fff;border:1px solid var(--borda);border-radius:16px;box-shadow:0 10px 30px rgba(29,24,56,.18);padding:10px 12px;display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center;z-index:35;transition:transform .3s}
+  #barraFrete.on{transform:translate(-50%,0)}
+  #barraFrete .barra{grid-column:1}
+  #barraFrete .bf-txt{font-size:.88rem}
+  #barraFrete .bf-ver{grid-row:1/3;grid-column:2;background:var(--cor);color:#fff;border-radius:10px;padding:9px 12px;font-weight:800;font-size:.85rem}
+  body.gaveta-aberta #barraFrete{transform:translate(-50%,140%)}
   .limpar{background:none;color:var(--suave);font-size:.82rem;text-decoration:underline;padding:2px}
   .chav-mini{margin-top:6px;padding:4px 8px;font-size:.78rem;gap:5px}
   .chav-mini input{width:14px;height:14px}
@@ -131,7 +141,7 @@
   .rodape-logo{height:60px;margin-bottom:12px}
   .sobre{background:#fff;border:1px solid var(--borda);border-radius:var(--raio);padding:22px;display:grid;gap:10px}
 
-  footer{background:var(--navy);color:#f4e9e3;padding:30px 18px;text-align:center;font-size:.9rem}
+  footer{background:var(--navy);color:#f4e9e3;padding:30px 18px 100px;text-align:center;font-size:.9rem}
   footer .links{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:10px}
   footer a{text-decoration:none;opacity:.85}
 
@@ -241,8 +251,9 @@
   <div class="g-rodape" id="gRodape"></div>
 </aside>
 <div class="toast" id="toast"></div>
+<div id="barraFrete"></div>
 
-<script src="config.js?v=2"></script>
+<script src="config.js?v=3"></script>
 <script>
 /* =========================================================
    CONFIGURAÇÃO — edite aqui
@@ -328,6 +339,37 @@ async function carregarFB(){
   const loja = rl.ok ? ler(await rl.json()) : null;
   return prods.length ? {prods: prods.sort((a,b)=>a.id-b.id), loja} : null;   // banco vazio (antes de importar) → usa os arquivos
 }
+/* ---------- números da loja: visitas, carrinho e pedidos (sem dados pessoais) ---------- */
+const temFB = () => !!(FB.apiKey && FB.projectId);
+function gravarFS(colecao, campos){
+  if(!temFB()) return;
+  const fields = {criado:{timestampValue:new Date().toISOString()}};
+  for(const [k,v] of Object.entries(campos)) fields[k] = {stringValue: typeof v === "string" ? v : JSON.stringify(v)};
+  try{
+    fetch(`https://firestore.googleapis.com/v1/projects/${FB.projectId}/databases/(default)/documents/${colecao}?key=${FB.apiKey}`,
+      {method:"POST", keepalive:true, headers:{"Content-Type":"application/json"}, body:JSON.stringify({fields})}).catch(()=>{});
+  }catch(e){}
+}
+const ehLojista = () => { try{ return !!localStorage.getItem("popzin_fb"); }catch(e){ return false; } };   // não conta as suas visitas
+function registrar(tipo, dados={}){
+  if(ehLojista()) return;
+  gravarFS("eventos", {tipo, json:{...dados}});
+}
+function registrarVisita(){
+  try{ if(sessionStorage.getItem("popzin_visita")) return; sessionStorage.setItem("popzin_visita","1"); }catch(e){}
+  let origem = "direto";
+  try{
+    const u = new URLSearchParams(location.search).get("utm_source");
+    if(u) origem = u.toLowerCase().slice(0,30);
+    else if(document.referrer){ const h = new URL(document.referrer).hostname.replace(/^www\./,""); if(h !== location.hostname) origem = h.slice(0,40); }
+  }catch(e){}
+  registrar("visita", {origem, celular: matchMedia("(max-width:640px)").matches});
+}
+function registrarPedido(pedido){
+  if(ehLojista()) return;
+  gravarFS("pedidos", {status:"novo", json:pedido});
+}
+
 async function iniciar(){
   let viaBanco = null;
   try { viaBanco = await carregarFB(); } catch(e){}
@@ -343,6 +385,7 @@ async function iniciar(){
   if(!CONFIG.fretes[regiao]) regiao = Object.keys(CONFIG.fretes)[0];
   montarTela();
   render();
+  registrarVisita();
 }
 
 function montarTela(){
@@ -351,8 +394,10 @@ const freteTxt = Object.entries(CONFIG.fretes).map(([r,v]) => `${brl(v).replace(
 $("#promoTitulo").textContent = CONFIG.faixaTitulo || `🚚 Frete GRÁTIS para todo o Brasil acima de ${brl(CONFIG.freteGratisAcima).replace(",00","")}`;
 $("#promoSub").textContent = CONFIG.faixaSub || `Abaixo disso: ${freteTxt} · Pronta entrega sai em até 24h úteis`;
 $("#promo").style.display = CONFIG.faixaOcultar ? "none" : "";
-$("#atalhos").innerHTML = ATALHOS.map(a =>
-  `<a href="${a.vip ? CONFIG.linkGrupoVip : wa(a.msg)}" target="_blank" rel="noopener">${a.txt}${a.breve?'<span class="tag-breve">EM BREVE</span>':''}</a>`).join("");
+const prazo = (CONFIG.prazoEncomenda||"").trim();
+$("#atalhos").innerHTML = ATALHOS.map((a,i) => {
+  const ehEnc = i === 0 && prazo, msg = ehEnc ? `${a.msg} (vi que o prazo é de ${prazo})` : a.msg;
+  return `<a href="${a.vip ? CONFIG.linkGrupoVip : wa(msg)}" target="_blank" rel="noopener">${a.txt}${ehEnc?`<span class="tag-prazo">⏱ ${prazo}</span>`:""}${a.breve?'<span class="tag-breve">EM BREVE</span>':''}</a>`; }).join("");
 $("#lnkVip").href = CONFIG.linkGrupoVip;
 $("#lnkInsta").href = CONFIG.instagram || "#";
 $("#ano").textContent = new Date().getFullYear();
@@ -400,6 +445,9 @@ const aceitaChav = p => precoChav() > 0 && !p.semChaveiro;
 const chave = (id, c) => c ? `${id}:c` : `${id}`;
 const lerChave = k => { const [id, c] = String(k).split(":"); return {id:+id, c: c==="c"}; };
 const qtdNoCarrinho = id => Object.entries(carrinho).reduce((s,[k,q]) => s + (lerChave(k).id===id ? q : 0), 0);
+/* combo: "a partir de N unidades, R$ X cada" (promoQtd / promoPreco no produto) */
+const temCombo = p => +p.promoQtd >= 2 && +p.promoPreco > 0 && +p.promoPreco < p.preco;
+const precoBase = (p, qtd) => temCombo(p) && qtd >= +p.promoQtd ? +p.promoPreco : p.preco;
 
 function card(p){
   const off = p.de ? Math.round((1-p.preco/p.de)*100) : 0;
@@ -418,6 +466,7 @@ function card(p){
         ${p.de?`<span class="de">${brl(p.de)}</span>`:""}<span class="preco">${brl(p.preco)}</span>
         <div class="pix">${brl(pixDe(p.preco))} no Pix</div>
       </div>
+      ${!esg && temCombo(p) ? `<div class="combo">🔥 Leve ${p.promoQtd}+: <b>${brl(+p.promoPreco)}</b> cada</div>` : ""}
       ${!esg && aceitaChav(p) ? `<label class="chav"><input type="checkbox" data-chav="${p.id}"> <span>🔑 Chaveiro</span> <b>+${brl(precoChav())}</b></label>` : ""}
       ${esg
         ? `<a class="btn sec" target="_blank" rel="noopener" href="${wa(`Olá! Me avisa quando o ${p.nome} voltar ao estoque? 🐾`)}">🔔 Avise-me quando voltar</a>`
@@ -433,6 +482,7 @@ $("#grade").onclick = e => {
     const cb = a.closest(".info").querySelector("[data-chav]"); const c = !!cb?.checked;
     if(qtdNoCarrinho(id) >= p.estoque) return toast("Estoque máximo atingido");
     const k = chave(id, c); carrinho[k]=(carrinho[k]||0)+1; salvar("popzin_carrinho",carrinho); atualizaCarrinho();
+    registrar("carrinho", {id, nome:p.nome});
     abrir(true); }
 };
 $("#btnFavs").onclick = () => { estado.soFavs=!estado.soFavs; render(); $("#grade").scrollIntoView({behavior:"smooth",block:"start"}); };
@@ -440,19 +490,23 @@ $("#btnFavs").onclick = () => { estado.soFavs=!estado.soFavs; render(); $("#grad
 /* carrinho */
 function itensCarrinho(){
   return Object.entries(carrinho).map(([k,q]) => { const {id,c} = lerChave(k); const p = PRODUTOS.find(x=>x.id===id);
-    return {k, p, q, c, un: p ? p.preco + (c ? precoChav() : 0) : 0}; }).filter(i=>i.p&&i.q>0);
+    if(!p) return {k,p,q,c,un:0};
+    const tot = qtdNoCarrinho(id), base = precoBase(p, tot);
+    return {k, p, q, c, base, combo: base < p.preco, falta: temCombo(p) && tot < +p.promoQtd ? +p.promoQtd - tot : 0,
+            un: base + (c ? precoChav() : 0)}; }).filter(i=>i.p&&i.q>0);
 }
 function atualizaCarrinho(){
   const itens = itensCarrinho();
   $("#nCarrinho").textContent = itens.reduce((s,i)=>s+i.q,0);
+  barraFrete(itens);
   if(!itens.length){
     $("#gItens").innerHTML = `<div class="vazio">Seu carrinho está vazio 🐾</div>`;
     $("#gRodape").innerHTML = ""; return;
   }
-  $("#gItens").innerHTML = itens.map(({k,p,q,c,un})=>`
+  $("#gItens").innerHTML = itens.map(({k,p,q,c,un,combo,falta})=>`
     <div class="item">
       <div class="mini" style="background:${p.cor||'#f5eee9'}">${p.foto?`<img src="${p.foto}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`:(p.emoji||'🐾')}</div>
-      <div class="txt"><b>${p.nome}</b><br>${brl(un)} un.${aceitaChav(p)?`<label class="chav chav-mini"><input type="checkbox" data-trocachav="${k}" ${c?"checked":""}> <span>🔑 Chaveiro</span> <b>+${brl(precoChav())}</b></label>`:""}</div>
+      <div class="txt"><b>${p.nome}</b><br>${combo?`<s class="de">${brl(p.preco+(c?precoChav():0))}</s> `:""}${brl(un)} un.${combo?` <span class="tag-combo">🔥 combo</span>`:""}${falta?`<div class="dica-combo">+${falta} e paga ${brl(+p.promoPreco)} cada</div>`:""}${aceitaChav(p)?`<label class="chav chav-mini"><input type="checkbox" data-trocachav="${k}" ${c?"checked":""}> <span>🔑 Chaveiro</span> <b>+${brl(precoChav())}</b></label>`:""}</div>
       <div class="qtd"><button data-menos="${k}">−</button>${q}<button data-mais="${k}">+</button></div>
     </div>`).join("");
   const sub = itens.reduce((s,i)=>s+i.un*i.q,0);
@@ -477,13 +531,31 @@ function atualizaCarrinho(){
   $("#continuar").onclick = () => abrir(false);
   $("#selRegiao").onchange = e => { regiao=e.target.value; salvar("popzin_regiao",regiao); atualizaCarrinho(); };
   const montaLink = () => {
-    const linhas = itens.map(({p,q,c,un})=>`• ${q}x ${p.nome}${c?` + chaveiro (+${brl(precoChav())})`:""} — ${brl(un*q)}`).join("\n");
+    const linhas = itens.map(({p,q,c,un,combo})=>`• ${q}x ${p.nome}${c?` + chaveiro (+${brl(precoChav())})`:""}${combo?" (combo)":""} — ${brl(un*q)}`).join("\n");
     const obs = $("#obs").value.trim();
     $("#finalizar").href = wa(`Olá, ${CONFIG.loja}! Quero fazer este pedido 🐾\n\n${linhas}\n\nSubtotal: ${brl(sub)}\nFrete (${regiao}): ${gratis?"Grátis":brl(frete)}\nTotal: ${brl(total)}\nTotal no Pix: ${brl(pixDe(sub)+frete)}${obs?`\n\nObs.: ${obs}`:""}`);
   };
   montaLink(); $("#obs").oninput = montaLink;
+  $("#finalizar").onclick = () => registrarPedido({
+    itens: itens.map(({p,q,c,un,combo}) => ({id:p.id, nome:p.nome, q, chaveiro:c, combo:!!combo, un:+un.toFixed(2)})),
+    qtd: itens.reduce((s,i)=>s+i.q,0), sub:+sub.toFixed(2), frete, total:+total.toFixed(2), totalPix:+(pixDe(sub)+frete).toFixed(2),
+    regiao, freteGratis: gratis, obs: $("#obs").value.trim().slice(0,300)
+  });
   $("#limpar").onclick = () => { carrinho={}; salvar("popzin_carrinho",carrinho); atualizaCarrinho(); };
 }
+/* barra flutuante: quanto falta para o frete grátis (aparece com o carrinho fechado) */
+function barraFrete(itens){
+  const el = $("#barraFrete"); if(!el) return;
+  const sub = itens.reduce((s,i)=>s+i.un*i.q,0), meta = +CONFIG.freteGratisAcima || 0;
+  if(!itens.length || !meta){ el.classList.remove("on"); return; }
+  const ok = sub >= meta;
+  el.innerHTML = `<div class="bf-txt">${ok ? "🎉 Frete grátis garantido!" : `🚚 Faltam <b>${brl(meta-sub)}</b> para o frete grátis`}</div>
+    <div class="barra"><i style="width:${Math.min(100,sub/meta*100)}%"></i></div>
+    <button class="bf-ver" type="button">Ver carrinho (${itens.reduce((s,i)=>s+i.q,0)})</button>`;
+  el.querySelector(".bf-ver").onclick = () => abrir(true);
+  el.classList.add("on");
+}
+
 /* troca uma linha do carrinho entre "com" e "sem" chaveiro (junta se já existir a outra) */
 function trocarChaveiro(k, comChav){
   const {id} = lerChave(k), destino = chave(id, comChav);
@@ -508,7 +580,7 @@ $("#gItens").onclick = e => {
   if(n){ const k=n.dataset.menos; carrinho[k]--; if(carrinho[k]<=0) delete carrinho[k]; }
   salvar("popzin_carrinho",carrinho); atualizaCarrinho();
 };
-const abrir = v => { $("#gaveta").classList.toggle("aberto",v); $("#veu").classList.toggle("aberto",v); };
+const abrir = v => { $("#gaveta").classList.toggle("aberto",v); $("#veu").classList.toggle("aberto",v); document.body.classList.toggle("gaveta-aberta", v); };
 $("#btnCarrinho").onclick = () => abrir(true);
 $("#fechar").onclick = $("#veu").onclick = () => abrir(false);
 

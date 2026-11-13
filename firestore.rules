@@ -9,6 +9,13 @@ service cloud.firestore {
         && request.auth.token.email in ['SEU-EMAIL-AQUI@exemplo.com'];
     }
 
+    // data enviada pelo site precisa ser "agora" (evita lixo com datas falsas)
+    function criadoAgora() {
+      return request.resource.data.criado is timestamp
+        && request.resource.data.criado > request.time - duration.value(10, 'm')
+        && request.resource.data.criado < request.time + duration.value(10, 'm');
+    }
+
     // catálogo e configurações: qualquer visitante lê, só o administrador altera
     match /produtos/{id} {
       allow read: if true;
@@ -17,6 +24,27 @@ service cloud.firestore {
     match /config/{doc} {
       allow read: if true;
       allow write: if ehAdmin();
+    }
+
+    // números da loja: o site só CRIA (visitas e itens no carrinho); só o administrador lê
+    match /eventos/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['criado', 'tipo', 'json'])
+        && request.resource.data.tipo in ['visita', 'carrinho']
+        && request.resource.data.json is string && request.resource.data.json.size() < 500
+        && criadoAgora();
+      allow read, delete: if ehAdmin();
+    }
+
+    // pedidos enviados pelo WhatsApp: o site só cria; o administrador lê e muda o andamento
+    match /pedidos/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['criado', 'status', 'json'])
+        && request.resource.data.status == 'novo'
+        && request.resource.data.json is string && request.resource.data.json.size() < 6000
+        && criadoAgora();
+      allow read, delete: if ehAdmin();
+      allow update: if ehAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['novo', 'pago', 'enviado', 'cancelado'];
     }
 
     // qualquer outra coisa: bloqueado
