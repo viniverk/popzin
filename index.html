@@ -412,13 +412,13 @@ function montarFiltros(){
   const cont = t => PRODUTOS.filter(p => t==="todos" || p.tipo===t).length;
   const tipos = Object.entries(TIPOS).filter(([k]) => k==="todos" || cont(k) > 0);
   if(!tipos.some(([k]) => k===estado.tipo)) estado.tipo = "todos";
-  $("#abas").innerHTML = tipos.length > 2 ? tipos.map(([k,v]) => `<button class="aba" data-tipo="${k}">${v} <small>${cont(k)}</small></button>`).join("") : "";
+  $("#abas").innerHTML = tipos.length > 1 ? tipos.map(([k,v]) => `<button class="aba" data-tipo="${k}">${v} <small>${cont(k)}</small></button>`).join("") : "";
   const base = PRODUTOS.filter(p => estado.tipo==="todos" || p.tipo===estado.tipo);
   const cols = [...new Set(base.map(p=>p.colecao).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
   if(estado.colecao && !cols.includes(estado.colecao)) estado.colecao = "";
   $("#selColecao").innerHTML = `<option value="">📚 Todas as coleções</option>` +
     cols.map(c => `<option ${c===estado.colecao?"selected":""} value="${c}">${c} (${base.filter(p=>p.colecao===c).length})</option>`).join("");
-  $("#selColecao").style.display = cols.length > 1 ? "" : "none";
+  $("#selColecao").style.display = cols.length ? "" : "none";
 }
 $("#abas").onclick = e => { const b=e.target.closest(".aba"); if(!b) return; estado.tipo=b.dataset.tipo; estado.soFavs=false; montarFiltros(); render(); };
 $("#selColecao").onchange = e => { estado.colecao=e.target.value; render(); };
