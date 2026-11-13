@@ -69,6 +69,8 @@
   .abas{display:flex;gap:6px;flex-wrap:wrap}
   .aba{background:#fff;border:1px solid var(--borda);border-radius:999px;padding:8px 16px;font-weight:700;color:var(--texto)}
   .aba.ativa{background:var(--cor);border-color:var(--cor);color:#fff}
+  .aba small{opacity:.6;font-weight:700;margin-left:2px}
+  .atalhos{scrollbar-width:none}.atalhos::-webkit-scrollbar{display:none}
   .controles select,.controles input{border:1px solid var(--borda);border-radius:12px;padding:9px 12px;font-family:inherit;font-size:.92rem;background:#fff;color:var(--texto)}
   .controles input{flex:1;min-width:180px}
   .contagem{color:var(--suave);font-size:.9rem;margin-bottom:10px}
@@ -401,13 +403,24 @@ $("#atalhos").innerHTML = ATALHOS.map((a,i) => {
 $("#lnkVip").href = CONFIG.linkGrupoVip;
 $("#lnkInsta").href = CONFIG.instagram || "#";
 $("#ano").textContent = new Date().getFullYear();
-const colecoes = [...new Set(PRODUTOS.map(p=>p.colecao).filter(Boolean))].sort();
-$("#selColecao").innerHTML = `<option value="">📚 Todas as coleções</option>` + colecoes.map(c=>`<option>${c}</option>`).join("");
+montarFiltros();
 }
 
 /* abas e coleções */
-$("#abas").innerHTML = Object.entries(TIPOS).map(([k,v]) => `<button class="aba" data-tipo="${k}">${v}</button>`).join("");
-$("#abas").onclick = e => { const b=e.target.closest(".aba"); if(!b) return; estado.tipo=b.dataset.tipo; estado.soFavs=false; render(); };
+/* só mostra abas/coleções que têm produto, com a contagem */
+function montarFiltros(){
+  const cont = t => PRODUTOS.filter(p => t==="todos" || p.tipo===t).length;
+  const tipos = Object.entries(TIPOS).filter(([k]) => k==="todos" || cont(k) > 0);
+  if(!tipos.some(([k]) => k===estado.tipo)) estado.tipo = "todos";
+  $("#abas").innerHTML = tipos.length > 2 ? tipos.map(([k,v]) => `<button class="aba" data-tipo="${k}">${v} <small>${cont(k)}</small></button>`).join("") : "";
+  const base = PRODUTOS.filter(p => estado.tipo==="todos" || p.tipo===estado.tipo);
+  const cols = [...new Set(base.map(p=>p.colecao).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  if(estado.colecao && !cols.includes(estado.colecao)) estado.colecao = "";
+  $("#selColecao").innerHTML = `<option value="">📚 Todas as coleções</option>` +
+    cols.map(c => `<option ${c===estado.colecao?"selected":""} value="${c}">${c} (${base.filter(p=>p.colecao===c).length})</option>`).join("");
+  $("#selColecao").style.display = cols.length > 1 ? "" : "none";
+}
+$("#abas").onclick = e => { const b=e.target.closest(".aba"); if(!b) return; estado.tipo=b.dataset.tipo; estado.soFavs=false; montarFiltros(); render(); };
 $("#selColecao").onchange = e => { estado.colecao=e.target.value; render(); };
 $("#selOrdem").onchange = e => { estado.ordem=e.target.value; render(); };
 $("#busca").oninput = e => { estado.busca=e.target.value.toLowerCase(); render(); };
@@ -434,7 +447,10 @@ function render(){
 
   $("#contagem").textContent = estado.soFavs ? `🤍 Seus favoritos: ${lista.length}` : `${lista.length} bichinho(s)`;
   $("#grade").innerHTML = lista.length ? lista.map(card).join("") :
-    `<div class="vazio">${estado.soFavs ? "Você ainda não favoritou nenhum bichinho 🤍" : "Nenhum bichinho encontrado 🐾"}</div>`;
+    `<div class="vazio">${estado.soFavs ? "Você ainda não favoritou nenhum bichinho 🤍" : "Nenhum bichinho encontrado com esses filtros 🐾"}
+      <br><button class="btn sec" id="limparFiltros" style="width:auto;margin-top:12px;padding:8px 18px">Limpar filtros</button></div>`;
+  const lf = $("#limparFiltros");
+  if(lf) lf.onclick = () => { estado = {...estado, tipo:"todos", colecao:"", busca:"", soFavs:false}; $("#busca").value = ""; montarFiltros(); render(); };
   $("#nFavs").textContent = favs.length;
   atualizaCarrinho();
 }
