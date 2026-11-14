@@ -3,7 +3,14 @@
 `worker.js` gera o Pix no Mercado Pago, grava o pedido no Firestore, recebe o aviso de pagamento
 e expira pedidos não pagos (relógio de 5 minutos).
 
-## Publicar
+## Publicação automática
+O worker `popzin-api` está ligado a este repositório (Cloudflare → Workers Builds, pasta `/worker`).
+Todo push na branch `main` publica de novo, usando `wrangler.toml` (variáveis públicas e o cron de 5 min).
+Só os dois segredos ficam no painel: `MP_ACCESS_TOKEN` e `FIREBASE_SA` (Settings → Variables and Secrets → tipo Secret).
+
+Endereço: https://popzin-api.discipulos-pagamento.workers.dev
+
+## Publicar manualmente (alternativa)
 1. Cloudflare → Workers & Pages → Create → Worker → nome `popzin-api` → Deploy → **Edit code**.
 2. Apague o código de exemplo, cole todo o `worker.js` → **Deploy**.
 3. Settings → **Variables and Secrets** → Add:
