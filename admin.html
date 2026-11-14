@@ -751,6 +751,15 @@ function desenharVendas(){
         ${p.origem==="site" && ["enviado","entregue"].includes(p.status) ? `<div style="margin-top:6px;display:flex;gap:4px"><input class="st" style="width:120px" placeholder="rastreio" value="${esc(p.rastreio||"")}" data-rastreio="${p.id}"><button class="btn sec" style="padding:4px 8px;font-size:.8rem" data-salvarrastreio="${p.id}">ok</button></div>` : ""}</td>
     </tr>`; }).join("")}</tbody></table>` : `<div class="vazio-v">Nenhum pedido no período.</div>`);
 }
+/* pede ao servidor para mandar o e-mail de status ao cliente (só pedidos do site) */
+async function avisarCliente(id){
+  const api = ((window.POPZIN_CHECKOUT||{}).api||"").replace(/\/+$/,"");
+  if(!api) return null;
+  try{
+    const r = await fetch(`${api}/notificar`, {method:"POST", headers:{"Content-Type":"application/json", Authorization:`Bearer ${await fbToken()}`}, body:JSON.stringify({id})});
+    return await r.json();
+  }catch(e){ return null; }
+}
 /* grava status/rastreio no pedido mantendo o histórico (o cliente vê na página do pedido) */
 async function gravarPedido(id, mudar){
   const d = await fs(`pedidos/${id}`);
@@ -766,7 +775,9 @@ async function gravarPedido(id, mudar){
 $("#vPedidos").onclick = async e => {
   const b = e.target.closest("[data-salvarrastreio]"); if(!b) return;
   const id = b.dataset.salvarrastreio, val = $(`[data-rastreio="${id}"]`).value;
-  try{ await gravarPedido(id, {rastreio: val}); const p = vendasCache.pedidos.find(x => x.id === id); if(p) p.rastreio = val.trim().toUpperCase(); toast("Rastreio salvo — o cliente já vê na página do pedido ✅"); }
+  try{ await gravarPedido(id, {rastreio: val}); const p = vendasCache.pedidos.find(x => x.id === id); if(p) p.rastreio = val.trim().toUpperCase();
+       const av = p?.origem === "site" && p.status === "enviado" ? await avisarCliente(id) : null;
+       toast(av?.enviado ? `Rastreio salvo e enviado por e-mail para ${av.para} ✅` : "Rastreio salvo — o cliente já vê na página do pedido ✅"); }
   catch(err){ toast(err.message, true); }
 };
 $("#vPedidos").onchange = async e => {
@@ -790,7 +801,10 @@ $("#vPedidos").onchange = async e => {
       renderTabela();
     }
     desenharVendas();
-    toast(sinal > 0 ? "Venda confirmada ✅ — vendidos atualizados" : sinal < 0 ? "Pedido saiu das vendas — vendidos descontados" : `Pedido: ${STATUS[novo]} ✅`);
+    const esperaRastreio = ped?.origem === "site" && novo === "enviado";      // e-mail de envio sai junto com o rastreio
+    const av = ped?.origem === "site" && !esperaRastreio ? await avisarCliente(id) : null;
+    if(esperaRastreio){ toast("Digite o código de rastreio e clique em ok — o cliente recebe o e-mail de envio (ou clique ok vazio para avisar sem código)"); setTimeout(() => $(`[data-rastreio="${id}"]`)?.focus(), 100); return; }
+    toast((sinal > 0 ? "Venda confirmada ✅ — vendidos atualizados" : sinal < 0 ? "Pedido saiu das vendas — vendidos descontados" : `Pedido: ${STATUS[novo]} ✅`) + (av?.enviado ? ` · e-mail enviado para ${av.para}` : ""));
   }catch(err){ toast(err.message, true); }
 };
 

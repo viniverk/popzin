@@ -785,7 +785,7 @@ function telaPago(p, j){
       <h3 style="font-family:'Baloo 2',cursive;font-size:1.5rem">Obrigado${j.primeiroNome ? `, ${escH(j.primeiroNome)}` : ""}!</h3>
       <div>Recebemos o pagamento do pedido <b>${escH(p.id.toUpperCase())}</b>. Agora é com a gente: vamos preparar seus bichinhos com carinho.</div>
       <a class="btn" href="${link}">📦 Acompanhar meu pedido</a>
-      <div style="font-size:.82rem;color:var(--suave)">Guarde este link: é por ele que você vê o andamento e o código de rastreio.</div>
+      <div style="font-size:.85rem;color:var(--suave)">📧 Também enviamos este link para o seu e-mail. A cada novidade (preparo, envio com rastreio e entrega) você recebe um aviso.</div>
       <button class="btn sec" type="button" id="ckVoltar">Voltar para a loja</button>
     </div>`;
   $("#ckVoltar").onclick = fecharCheckout;

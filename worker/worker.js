@@ -5,6 +5,7 @@
      POST /pix            cria o pedido + cobrança Pix no Mercado Pago
      GET  /pedido/:id?t=  status do pedido para o cliente (link secreto)
      POST /webhook        aviso do Mercado Pago (pagamento aprovado)
+     POST /notificar      painel avisa mudança de status → e-mail ao cliente
      (cron)               a cada 5 min: expira pedidos não pagos
 
    Variáveis (Cloudflare → Worker → Settings → Variables and Secrets):
@@ -12,6 +13,8 @@
      FIREBASE_SA       (secret) JSON inteiro da conta de serviço do Firebase
      FIREBASE_PROJECT  popzin
      ORIGENS           https://popzin.com.br,https://www.popzin.com.br,https://viniverk.github.io
+     RESEND_API_KEY    (secret) chave do Resend para enviar e-mails (sem ela, nada é enviado)
+     SITE_URL          https://popzin.com.br   ·   EMAIL_DE  PopZin <pedidos@popzin.com.br>
    Opcionais: MP_API (padrão https://api.mercadopago.com), MINUTOS_PIX (padrão 5)
    ===================================================================== */
 
@@ -26,6 +29,7 @@ export default {
       if (req.method === "POST" && url.pathname === "/pix") return json(await criarPix(req, env, url), 200, cors);
       const m = url.pathname.match(/^\/pedido\/([a-z0-9]{6,40})$/);
       if (req.method === "GET" && m) return json(await statusPedido(m[1], url.searchParams.get("t") || "", env), 200, cors);
+      if (req.method === "POST" && url.pathname === "/notificar") return json(await notificar(req, env), 200, { ...cors, "Access-Control-Allow-Headers": "Content-Type, Authorization" });
       if (url.pathname === "/webhook") { ctx?.waitUntil ? ctx.waitUntil(webhook(req, url, env)) : await webhook(req, url, env); return new Response("ok"); }
       if (url.pathname === "/") return json({ ok: true, servico: "PopZin pagamentos" }, 200, cors);
       return json({ erro: "Rota não encontrada" }, 404, cors);
@@ -46,7 +50,7 @@ function corsHeaders(req, env) {
   const origem = req.headers.get("Origin") || "";
   const ok = (env.ORIGENS || "").split(",").map(s => s.trim()).filter(Boolean);
   return origem && ok.includes(origem)
-    ? { "Access-Control-Allow-Origin": origem, "Access-Control-Allow-Methods": "GET,POST,OPTIONS", "Access-Control-Allow-Headers": "Content-Type", "Vary": "Origin" }
+    ? { "Access-Control-Allow-Origin": origem, "Access-Control-Allow-Methods": "GET,POST,OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization", "Vary": "Origin" }
     : {};
 }
 function erroPublico(msg, status = 400) { const e = new Error(msg); e.publico = msg; e.status = status; return e; }
@@ -259,7 +263,10 @@ async function aplicarPagamento(env, ped, pg) {
   const agora = new Date().toISOString();
   const dados = { ...ped.dados, pagoEm: pg.date_approved || agora, qr: "", qrImg: "",
                   historico: [...(ped.dados.historico || []), { status: "pago", em: agora }] };
+  const chaveEmail = chaveEmailDe("pago", dados);
+  dados.emails = { ...(dados.emails || {}), [chaveEmail]: agora };
   if (!(await gravarPedidoSe(env, ped, dados, "pago"))) return;              // outro processo chegou antes
+  try { await enviarEmailStatus(env, dados, ped.doc.fields.token?.stringValue, "pago"); } catch (e) { console.error("email pago", dados.id, e.message); }
   // baixa de estoque e soma de vendidos
   const produtos = await listarProdutos(env);
   const soma = {};
@@ -281,4 +288,78 @@ async function expirarPendentes(env) {
     const ped = { doc: x.document, dados: lerJson(x.document) || {}, status: "aguardando" };
     try { await sincronizar(env, ped); } catch (e) { console.error("expirar", ped.dados.id, e.message); }
   }
+}
+
+
+/* ---------------------------------------------------- e-mails (Resend) */
+const chaveEmailDe = (status, d) => status === "enviado" && d.rastreio ? `enviado:${d.rastreio}` : status;
+const escE = t => String(t ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const brlE = v => "R$ " + (+v || 0).toFixed(2).replace(".", ",");
+const TEXTOS = {
+  pago:      ["✅ Pagamento confirmado", "Recebemos o seu pagamento! Agora é com a gente: vamos preparar seus bichinhos com carinho."],
+  preparo:   ["🛠️ Seu pedido está em preparo", "Seus bichinhos já estão sendo impressos e embalados."],
+  enviado:   ["📦 Seu pedido foi enviado", "Seu pedido saiu para entrega."],
+  entregue:  ["🏠 Pedido entregue", "Seu pedido foi entregue. Esperamos que você ame seus bichinhos! 🐾"],
+  cancelado: ["Pedido cancelado", "Seu pedido foi cancelado. Se tiver qualquer dúvida, é só responder este e-mail ou falar com a gente pelo WhatsApp."],
+};
+function htmlEmail(env, d, token, status) {
+  const [titulo, texto] = TEXTOS[status];
+  const site = (env.SITE_URL || "https://popzin.com.br").replace(/\/+$/, "");
+  const link = `${site}/pedido.html?id=${encodeURIComponent(d.id)}&t=${encodeURIComponent(token)}`;
+  const nome = escE((d.cliente?.nome || "").split(" ")[0]);
+  const itens = (d.itens || []).map(i => `<tr><td style="padding:6px 0;border-bottom:1px solid #eee">${i.q}× ${escE(i.nome)}${i.chaveiro ? " 🔑" : ""}</td><td style="padding:6px 0;border-bottom:1px solid #eee;text-align:right">${brlE(i.un * i.q)}</td></tr>`).join("");
+  const rastreio = status === "enviado" && d.rastreio
+    ? `<div style="background:#e3f0ff;border-radius:10px;padding:12px;margin:16px 0">Código de rastreio: <b style="font-size:16px">${escE(d.rastreio)}</b><br><a href="https://rastreamento.correios.com.br/app/index.php?objetos=${encodeURIComponent(d.rastreio)}" style="color:#0784b0">Rastrear nos Correios</a></div>` : "";
+  return { link, html: `<!DOCTYPE html><html><body style="margin:0;background:#f6f3ff;font-family:Arial,Helvetica,sans-serif;color:#1d1838">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden">
+<tr><td style="background:#0b1030;padding:18px 24px"><img src="${site}/img/marca/logo-texto.png" alt="PopZin" height="44" style="display:block;height:44px"></td></tr>
+<tr><td style="padding:24px">
+<h1 style="font-size:22px;margin:0 0 8px">${titulo}</h1>
+<p style="margin:0 0 4px">${nome ? `Olá, ${nome}! ` : ""}${texto}</p>
+<p style="margin:0 0 16px;color:#77729a;font-size:13px">Pedido <b>${escE(d.id.toUpperCase())}</b></p>
+${rastreio}
+<a href="${link}" style="display:inline-block;background:#7b2ff7;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:10px">Acompanhar meu pedido</a>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;font-size:14px">${itens}
+<tr><td style="padding:6px 0">Frete</td><td style="padding:6px 0;text-align:right">${d.frete ? brlE(d.frete) : "Grátis"}</td></tr>
+<tr><td style="padding:6px 0"><b>Total</b></td><td style="padding:6px 0;text-align:right"><b>${brlE(d.total)}</b></td></tr></table>
+<p style="color:#77729a;font-size:12px;margin-top:20px">Guarde este e-mail: pelo botão acima você acompanha o andamento a qualquer momento.</p>
+</td></tr>
+<tr><td style="background:#f6f3ff;padding:14px 24px;font-size:12px;color:#77729a;text-align:center">PopZin · Seu mundo em miniatura · <a href="${site}" style="color:#7b2ff7">popzin.com.br</a></td></tr>
+</table></td></tr></table></body></html>` };
+}
+async function enviarEmailStatus(env, d, token, status) {
+  if (!env.RESEND_API_KEY || !TEXTOS[status] || !d.cliente?.email || !token) return false;
+  const { html, link } = htmlEmail(env, d, token, status);
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `${d.id}-${chaveEmailDe(status, d)}` },
+    body: JSON.stringify({ from: env.EMAIL_DE || "PopZin <pedidos@popzin.com.br>", to: [d.cliente.email], subject: `${TEXTOS[status][0]} — pedido ${d.id.toUpperCase()}`,
+      html, text: `${TEXTOS[status][0]}\n\n${TEXTOS[status][1]}\n\nAcompanhe seu pedido: ${link}${status === "enviado" && d.rastreio ? `\nRastreio: ${d.rastreio}` : ""}` }),
+  });
+  if (!r.ok) throw new Error(`Resend ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  return true;
+}
+
+/* o painel chama depois de mudar o status / salvar o rastreio.
+   Quem chama prova que é o administrador lendo o pedido no Firestore com o próprio login
+   (as regras só deixam o administrador ler pedidos). */
+async function notificar(req, env) {
+  const tokenAdmin = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+  const { id } = await req.json().catch(() => ({}));
+  if (!tokenAdmin || !/^pz[a-z0-9]+$/.test(id || "")) throw erroPublico("Requisição inválida.");
+  const prova = await fetch(`${fsBase(env)}/pedidos/${id}`, { headers: { Authorization: `Bearer ${tokenAdmin}` } });
+  if (!prova.ok) throw erroPublico("Sem permissão.", 403);
+  for (let tentativa = 0; tentativa < 2; tentativa++) {
+    const ped = await lerPedido(env, id);
+    if (!ped) throw erroPublico("Pedido não encontrado.", 404);
+    const d = ped.dados, status = ped.status, chave = chaveEmailDe(status, d);
+    if (!TEXTOS[status] || !d.cliente?.email) return { enviado: false, motivo: "sem e-mail para este status" };
+    if ((d.emails || {})[chave]) return { enviado: false, motivo: "já enviado" };
+    if (!env.RESEND_API_KEY) return { enviado: false, motivo: "e-mail não configurado" };
+    const novo = { ...d, emails: { ...(d.emails || {}), [chave]: new Date().toISOString() } };
+    if (!(await gravarPedidoSe(env, ped, novo, status))) continue;            // mudou no meio: tenta de novo
+    await enviarEmailStatus(env, novo, ped.doc.fields.token?.stringValue, status);
+    return { enviado: true, para: d.cliente.email.replace(/^(.).*(@.*)$/, "$1***$2") };
+  }
+  return { enviado: false, motivo: "tente de novo" };
 }
