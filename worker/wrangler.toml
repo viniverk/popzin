@@ -1,0 +1,17 @@
+# Configuração do servidor de pagamentos (Cloudflare Worker "popzin-api").
+# Publicado automaticamente pelo Cloudflare Workers Builds a cada push neste repositório.
+# Os segredos (MP_ACCESS_TOKEN e FIREBASE_SA) ficam só no painel do Cloudflare, nunca aqui.
+name = "popzin-api"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+workers_dev = true
+
+[vars]
+FIREBASE_PROJECT = "popzin"
+ORIGENS = "https://popzin.com.br,https://www.popzin.com.br,https://viniverk.github.io"
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[observability]
+enabled = true
