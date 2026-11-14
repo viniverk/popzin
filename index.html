@@ -9,7 +9,13 @@
 <link rel="icon" type="image/png" href="img/marca/favicon.png">
 <link rel="apple-touch-icon" href="img/marca/icone-192.png">
 <meta property="og:title" content="PopZin — Seu mundo em miniatura">
-<meta property="og:image" content="img/marca/logo-mascote.webp">
+<meta property="og:image" content="https://popzin.com.br/img/marca/og-popzin.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://popzin.com.br/">
+<meta property="og:type" content="website">
+<meta property="og:description" content="Bichinhos articulados e colecionáveis impressos em 3D. Peça pelo WhatsApp!">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -310,6 +316,8 @@ const ATALHOS = [
 const TIPOS = {todos:"Todos", animal:"🐾 Animais", mini:"🧸 Minis", dino:"🦖 Dinos"};
 const $ = s => document.querySelector(s);
 const brl = v => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+/* Imgur entrega versões menores da mesma foto: "l" = 640px, "t" = 160px (bem mais leves que a original) */
+const mini = (url, tam="l") => { const m = /^(https:\/\/i\.imgur\.com\/[A-Za-z0-9]{5,10})\.(jpe?g|png|webp)$/i.exec(url||""); return m ? `${m[1]}${tam}.${m[2]}` : url; };
 const wa = msg => `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(msg)}`;
 
 function ler(k,p){ try{ return JSON.parse(localStorage.getItem(k)) ?? p }catch(e){ return p } }
@@ -473,7 +481,7 @@ function card(p){
   const selo = esg ? `<span class="selo esgot">ESGOTADO</span>` : off ? `<span class="selo">-${off}%</span>` : p.novo ? `<span class="selo novo">NOVO</span>` : "";
   return `<div class="card">
     <div class="foto" style="background:${p.cor||'#f5eee9'}">
-      ${p.foto ? `<img src="${p.foto}" alt="${p.nome}" loading="lazy">` : (p.emoji||'🐾')}
+      ${p.foto ? `<img src="${mini(p.foto)}" alt="${p.nome}" loading="lazy" onerror="if(this.src!=='${p.foto}')this.src='${p.foto}'">` : (p.emoji||'🐾')}
       ${selo}
       <button class="fav" data-fav="${p.id}" title="Favoritar">${favs.includes(p.id)?"❤️":"🤍"}</button>
       ${+p.vendidos > 0 ? `<span class="vendidos">🔥 ${(+p.vendidos).toLocaleString("pt-BR")} vendido${+p.vendidos>1?"s":""}</span>` : ""}
@@ -524,7 +532,7 @@ function atualizaCarrinho(){
   }
   $("#gItens").innerHTML = itens.map(({k,p,q,c,un,combo,falta})=>`
     <div class="item">
-      <div class="mini" style="background:${p.cor||'#f5eee9'}">${p.foto?`<img src="${p.foto}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`:(p.emoji||'🐾')}</div>
+      <div class="mini" style="background:${p.cor||'#f5eee9'}">${p.foto?`<img src="${mini(p.foto,"t")}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`:(p.emoji||'🐾')}</div>
       <div class="txt"><b>${p.nome}</b><br>${combo?`<s class="de">${brl(p.preco+(c?precoChav():0))}</s> `:""}${brl(un)} un.${combo?` <span class="tag-combo">🔥 combo</span>`:""}${falta?`<div class="dica-combo">+${falta} e paga ${brl(+p.promoPreco)} cada</div>`:""}${aceitaChav(p)?`<label class="chav chav-mini"><input type="checkbox" data-trocachav="${k}" ${c?"checked":""}> <span>🔑 Chaveiro</span> <b>+${brl(precoChav())}</b></label>`:""}</div>
       <div class="qtd"><button data-menos="${k}">−</button>${q}<button data-mais="${k}">+</button></div>
     </div>`).join("");
