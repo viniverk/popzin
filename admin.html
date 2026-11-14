@@ -234,7 +234,7 @@
       <label>Preço (R$)<input id="pPreco" type="number" step="0.01" min="0" required></label>
       <label>Preço "de" (opcional)<input id="pDe" type="number" step="0.01" min="0"></label>
       <label>Estoque<input id="pEstoque" type="number" min="0" value="0"></label>
-      <label>Vendidos (ordenação)<input id="pVendidos" type="number" min="0" value="0"></label>
+      <label>Vendidos (aparece na foto; soma sozinho ao marcar pedido pago)<input id="pVendidos" type="number" min="0" value="0"></label>
       <label>🔥 Combo: a partir de (un.)<input id="pPromoQtd" type="number" min="0" step="1" placeholder="ex.: 3 (vazio = sem combo)"></label>
       <label>🔥 Preço no combo (R$ cada)<input id="pPromoPreco" type="number" min="0" step="0.01" placeholder="ex.: 9.90"></label>
       <label>Emoji (sem foto)<input id="pEmoji" maxlength="8" placeholder="🐙"></label>
@@ -744,10 +744,24 @@ function desenharVendas(){
 $("#vPedidos").onchange = async e => {
   const s = e.target.closest("[data-pedido]"); if(!s) return;
   const id = s.dataset.pedido, novo = s.value;
+  const ped = vendasCache.pedidos.find(x => x.id === id), antes = ped?.status || "novo";
+  const conta = st => st === "pago" || st === "enviado";
   try{
     await fs(`pedidos/${id}?updateMask.fieldPaths=status`, {method:"PATCH", body:JSON.stringify({fields:{status:{stringValue:novo}}})});
-    const p = vendasCache.pedidos.find(x => x.id === id); if(p) p.status = novo;
-    desenharVendas(); toast("Pedido atualizado ✅");
+    if(ped) ped.status = novo;
+    // atualiza "vendidos" dos produtos quando o pedido entra ou sai de pago/enviado
+    const sinal = conta(novo) && !conta(antes) ? 1 : !conta(novo) && conta(antes) ? -1 : 0;
+    if(sinal && ped){
+      const atual = await BD.lerProdutos();
+      for(const it of (ped.itens||[])){
+        const prod = atual.find(x => x.id == it.id); if(!prod) continue;
+        prod.vendidos = Math.max(0, (+prod.vendidos||0) + sinal*(+it.q||0));
+        await BD.salvarProduto(prod);
+        const loc = produtos.find(x => x.id == prod.id); if(loc) loc.vendidos = prod.vendidos;
+      }
+      renderTabela();
+    }
+    desenharVendas(); toast(sinal > 0 ? "Pedido confirmado ✅ — vendidos atualizados" : sinal < 0 ? "Pedido atualizado — vendidos descontados" : "Pedido atualizado ✅");
   }catch(err){ toast(err.message, true); }
 };
 

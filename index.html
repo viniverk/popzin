@@ -104,6 +104,8 @@
   .selo{position:absolute;top:8px;left:8px;background:var(--cor);color:#fff;font-size:.72rem;font-weight:800;border-radius:8px;padding:3px 8px}
   .selo.novo{background:var(--cor2)}
   .selo.esgot{background:#9a8f8a}
+  .vendidos{position:absolute;left:8px;bottom:8px;background:rgba(11,16,48,.82);color:#fff;font-size:.75rem;font-weight:800;border-radius:999px;padding:4px 10px;backdrop-filter:blur(4px)}
+  @media (max-width:640px){.vendidos{font-size:.65rem;padding:3px 7px;left:6px;bottom:6px}}
   .info{padding:12px 14px 14px;display:flex;flex-direction:column;gap:4px;flex:1}
   .colecao{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--suave);font-weight:700}
   .nome{font-weight:700;font-size:1rem}
@@ -474,6 +476,7 @@ function card(p){
       ${p.foto ? `<img src="${p.foto}" alt="${p.nome}" loading="lazy">` : (p.emoji||'🐾')}
       ${selo}
       <button class="fav" data-fav="${p.id}" title="Favoritar">${favs.includes(p.id)?"❤️":"🤍"}</button>
+      ${+p.vendidos > 0 ? `<span class="vendidos">🔥 ${(+p.vendidos).toLocaleString("pt-BR")} vendido${+p.vendidos>1?"s":""}</span>` : ""}
     </div>
     <div class="info">
       <div class="colecao">${p.colecao}</div>
