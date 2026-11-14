@@ -7,3 +7,9 @@ window.POPZIN_FIREBASE = {
   apiKey: "AIzaSyCcgGT2fx61b_nGnDn1wVeMxYxUZ-C8oFc",
   projectId: "popzin"
 };
+
+/* Servidor de pagamentos (Cloudflare Worker). Endereço do worker, ex.: https://popzin-api.seunome.workers.dev
+   Em branco = o checkout com Pix fica escondido e a loja segue só com o pedido pelo WhatsApp. */
+window.POPZIN_CHECKOUT = {
+  api: ""
+};

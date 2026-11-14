@@ -175,6 +175,34 @@
   .barra{height:8px;background:var(--fundo);border-radius:99px;overflow:hidden}
   .barra i{display:block;height:100%;background:linear-gradient(90deg,var(--cor2),var(--cor))}
   a.btn{display:block;text-align:center;text-decoration:none}
+  /* checkout */
+  .ck-veu{position:fixed;inset:0;background:rgba(11,16,48,.55);z-index:70;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:4vh 10px}
+  .ck-veu.on{display:flex}
+  .ck-caixa{background:#fff;border-radius:22px;width:min(560px,100%);box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  .ck-topo{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--borda)}
+  .ck-topo h3{font-size:1.35rem}
+  .ck-corpo{padding:16px 18px 20px;display:grid;gap:12px}
+  .ck-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+  .ck-grid label{display:grid;gap:4px;font-size:.78rem;font-weight:700;color:var(--suave);grid-column:span 6}
+  .ck-grid .m3{grid-column:span 3}.ck-grid .m2{grid-column:span 2}.ck-grid .m4{grid-column:span 4}
+  .ck-grid input,.ck-grid select{border:1px solid var(--borda);border-radius:10px;padding:10px;font-family:inherit;font-size:.95rem;color:var(--texto);width:100%}
+  .ck-grid input:invalid:not(:placeholder-shown){border-color:#e07a7a}
+  .ck-sec{font-family:'Baloo 2',cursive;font-size:1.05rem;margin-top:4px}
+  .ck-resumo{background:var(--fundo);border-radius:14px;padding:12px 14px;display:grid;gap:4px;font-size:.9rem}
+  .ck-resumo .total{font-size:1.1rem}
+  .ck-aceite{display:flex;gap:8px;align-items:flex-start;font-size:.82rem;color:var(--suave)}
+  .ck-aceite input{margin-top:3px;accent-color:var(--cor)}
+  .ck-erro{background:#fdecec;color:#b33;border-radius:10px;padding:9px 12px;font-size:.88rem}
+  .ck-pix{display:grid;justify-items:center;gap:10px;text-align:center}
+  .ck-pix img{width:220px;height:220px;border-radius:12px;border:1px solid var(--borda);image-rendering:pixelated}
+  .ck-relogio{font-family:'Baloo 2',cursive;font-size:2.4rem;line-height:1;color:var(--cor)}
+  .ck-relogio.fim{color:#d64545}
+  .ck-codigo{width:100%;font-family:ui-monospace,monospace;font-size:.75rem;border:1px dashed var(--borda);border-radius:10px;padding:8px;word-break:break-all;max-height:70px;overflow:auto;background:var(--fundo)}
+  .ck-aguarde{display:flex;align-items:center;gap:8px;color:var(--suave);font-size:.88rem}
+  .ck-aguarde i{width:10px;height:10px;border-radius:50%;background:var(--cor2);animation:pulso 1s ease-in-out infinite}
+  @keyframes pulso{50%{opacity:.25;transform:scale(.7)}}
+  .ck-ok{font-size:3.5rem;line-height:1}
+  @media(max-width:640px){.ck-veu{padding:0}.ck-caixa{border-radius:0;min-height:100%}.ck-grid .m3,.ck-grid .m2,.ck-grid .m4{grid-column:span 6}.ck-grid .m2.uf{grid-column:span 2}.ck-grid .m4.cid{grid-column:span 4}}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--texto);color:#fff;padding:10px 18px;border-radius:999px;font-weight:700;transition:.25s;z-index:60}
   .toast.on{transform:translateX(-50%) translateY(0)}
 </style>
@@ -248,7 +276,7 @@
     <a href="#" id="lnkInsta" target="_blank" rel="noopener">📸 Instagram</a>
     <a href="#sobre">Sobre nós</a>
     <a href="admin.html">🔒 Área do lojista</a>
-    <a href="#">Política de privacidade</a>
+    <a href="politica.html">Política de privacidade</a>
   </div>
   <div>© <span id="ano"></span> PopZin · Feito com 💛 e muito filamento</div>
 </footer>
@@ -263,7 +291,15 @@
 <div class="toast" id="toast"></div>
 <div id="barraFrete"></div>
 
-<script src="config.js?v=3"></script>
+<!-- ===== checkout (Pix) ===== -->
+<div id="ck" class="ck-veu" aria-hidden="true">
+  <div class="ck-caixa" role="dialog" aria-modal="true" aria-labelledby="ckTitulo">
+    <div class="ck-topo"><h3 id="ckTitulo">Finalizar compra</h3><button class="btn-icone" id="ckFechar" type="button" aria-label="Fechar">✕</button></div>
+    <div class="ck-corpo" id="ckCorpo"></div>
+  </div>
+</div>
+
+<script src="config.js?v=4"></script>
 <script>
 /* =========================================================
    CONFIGURAÇÃO — edite aqui
@@ -552,7 +588,8 @@ function atualizaCarrinho(){
     <div class="linha total"><span>Total</span><span>${brl(total)}</span></div>
     <div class="linha pix"><span>No Pix (${CONFIG.descontoPix*100}% off nos produtos)</span><span>${brl(pixDe(sub)+frete)}</span></div>
     <input id="obs" placeholder="Observação (cor, presente...)">
-    <a class="btn" id="finalizar" target="_blank" rel="noopener" href="#">Finalizar pelo WhatsApp 💬</a>
+    ${temCheckout() ? `<button class="btn" id="pagarPix" type="button">⚡ Pagar com Pix</button>` : ""}
+    <a class="btn ${temCheckout() ? "sec" : ""}" id="finalizar" target="_blank" rel="noopener" href="#">${temCheckout() ? "Ou peça pelo WhatsApp 💬" : "Finalizar pelo WhatsApp 💬"}</a>
     <button class="btn sec" id="continuar">← Continuar comprando</button>
     <button class="limpar" id="limpar">Esvaziar carrinho</button>`;
   $("#continuar").onclick = () => abrir(false);
@@ -563,6 +600,7 @@ function atualizaCarrinho(){
     $("#finalizar").href = wa(`Olá, ${CONFIG.loja}! Quero fazer este pedido 🐾\n\n${linhas}\n\nSubtotal: ${brl(sub)}\nFrete (${regiao}): ${gratis?"Grátis":brl(frete)}\nTotal: ${brl(total)}\nTotal no Pix: ${brl(pixDe(sub)+frete)}${obs?`\n\nObs.: ${obs}`:""}`);
   };
   montaLink(); $("#obs").oninput = montaLink;
+  if($("#pagarPix")) $("#pagarPix").onclick = () => abrirCheckout($("#obs").value.trim());
   $("#finalizar").onclick = () => registrarPedido({
     itens: itens.map(({p,q,c,un,combo}) => ({id:p.id, nome:p.nome, q, chaveiro:c, combo:!!combo, un:+un.toFixed(2)})),
     qtd: itens.reduce((s,i)=>s+i.q,0), sub:+sub.toFixed(2), frete, total:+total.toFixed(2), totalPix:+(pixDe(sub)+frete).toFixed(2),
@@ -615,6 +653,155 @@ let tt; function toast(t){ const el=$("#toast"); el.textContent=t; el.classList.
 
 mostrarCarregando();
 iniciar();
+
+/* =========================================================
+   CHECKOUT COM PIX (servidor: worker/worker.js)
+   ========================================================= */
+const CK = window.POPZIN_CHECKOUT || {};
+const API = (CK.api || "").replace(/\/+$/, "");
+function temCheckout(){ return !!API; }
+const UF_NNE = ["AC","AP","AM","PA","RO","RR","TO","AL","BA","CE","MA","PB","PE","PI","RN","SE"];
+const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
+function regiaoPorUF(uf){
+  const ks = Object.keys(CONFIG.fretes||{}), nne = UF_NNE.includes(uf);
+  return ks.find(k => nne ? /norte|nordeste/i.test(k) : /sul|sudeste|centro/i.test(k)) || ks[0];
+}
+const escH = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ckDados = () => ler("popzin_cliente", {});
+let ckTimer = null, ckPoll = null, ckObs = "";
+function fecharCheckout(){ clearInterval(ckTimer); clearInterval(ckPoll); $("#ck").classList.remove("on"); $("#ck").setAttribute("aria-hidden","true"); }
+$("#ckFechar").onclick = fecharCheckout;
+
+function abrirCheckout(obs){
+  ckObs = obs || ""; abrir(false);
+  $("#ck").classList.add("on"); $("#ck").setAttribute("aria-hidden","false");
+  telaDados();
+}
+function telaDados(erro){
+  const d = ckDados();
+  $("#ckTitulo").textContent = "Seus dados";
+  $("#ckCorpo").innerHTML = `
+    ${erro ? `<div class="ck-erro">${escH(erro)}</div>` : ""}
+    <form id="ckForm" class="ck-grid" novalidate>
+      <div class="ck-sec" style="grid-column:span 6">👤 Contato</div>
+      <label>Nome completo<input name="nome" required autocomplete="name" value="${escH(d.nome)}" placeholder="Maria Souza"></label>
+      <label class="m3">E-mail<input name="email" type="email" required autocomplete="email" value="${escH(d.email)}" placeholder="voce@email.com"></label>
+      <label class="m3">WhatsApp<input name="telefone" required inputmode="tel" autocomplete="tel" value="${escH(d.telefone)}" placeholder="(47) 99999-9999"></label>
+      <label class="m3">CPF <small style="font-weight:400">(exigido para o Pix)</small><input name="cpf" required inputmode="numeric" value="${escH(d.cpf)}" placeholder="000.000.000-00"></label>
+      <div class="ck-sec" style="grid-column:span 6">📦 Entrega</div>
+      <label class="m2">CEP<input name="cep" required inputmode="numeric" autocomplete="postal-code" value="${escH(d.cep)}" placeholder="00000-000"></label>
+      <label class="m4">Rua<input name="rua" required autocomplete="address-line1" value="${escH(d.rua)}"></label>
+      <label class="m2">Número<input name="numero" required value="${escH(d.numero)}"></label>
+      <label class="m4">Complemento<input name="complemento" value="${escH(d.complemento)}" placeholder="opcional"></label>
+      <label class="m3">Bairro<input name="bairro" value="${escH(d.bairro)}"></label>
+      <label class="m2 cid m4">Cidade<input name="cidade" required value="${escH(d.cidade)}"></label>
+      <label class="m2 uf" style="grid-column:span 1">UF<select name="uf" required><option value=""></option>${UFS.map(u=>`<option ${u===d.uf?"selected":""}>${u}</option>`).join("")}</select></label>
+      <div id="ckResumo" class="ck-resumo" style="grid-column:span 6"></div>
+      <label class="ck-aceite" style="grid-column:span 6;color:var(--suave);font-weight:400"><span style="display:flex;gap:8px"><input type="checkbox" name="aceite" required ${d.nome?"checked":""}> <span>Li e aceito a <a href="politica.html" target="_blank" rel="noopener">política de privacidade</a>. Meus dados são usados só para este pedido e a entrega.</span></span></label>
+      <button class="btn" type="submit" style="grid-column:span 6">Gerar Pix ⚡</button>
+    </form>`;
+  const f = $("#ckForm");
+  const masc = (el, fn) => el.addEventListener("input", () => { el.value = fn(el.value); });
+  masc(f.cpf, v => v.replace(/\D/g,"").slice(0,11).replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d{1,2})$/,"$1-$2"));
+  masc(f.cep, v => v.replace(/\D/g,"").slice(0,8).replace(/(\d{5})(\d)/,"$1-$2"));
+  masc(f.telefone, v => v.replace(/\D/g,"").slice(0,11).replace(/^(\d{2})(\d)/,"($1) $2").replace(/(\d{5})(\d{4})$/,"$1-$2"));
+  f.cep.addEventListener("input", async () => {
+    const c = f.cep.value.replace(/\D/g,""); if(c.length !== 8) return;
+    try{ const r = await fetch(`https://viacep.com.br/ws/${c}/json/`); const j = await r.json();
+      if(!j.erro){ f.rua.value = j.logradouro || f.rua.value; f.bairro.value = j.bairro || f.bairro.value; f.cidade.value = j.localidade || f.cidade.value; f.uf.value = j.uf || f.uf.value; resumo(); f.numero.focus(); } }catch(e){}
+  });
+  f.uf.onchange = resumo; resumo();
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const dados = Object.fromEntries(new FormData(f)); delete dados.aceite;
+    const falta = [...f.querySelectorAll("[required]")].find(el => el.type==="checkbox" ? !el.checked : !el.value.trim());
+    if(falta){ falta.focus(); return toast(falta.type==="checkbox" ? "Aceite a política de privacidade" : "Preencha os campos obrigatórios"); }
+    salvar("popzin_cliente", dados);
+    const b = f.querySelector("button[type=submit]"); b.disabled = true; b.textContent = "Gerando Pix...";
+    try{
+      const r = await fetch(`${API}/pix`, {method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ cliente: dados, obs: ckObs, itens: itensCarrinho().map(i => ({id:i.p.id, q:i.q, chaveiro:i.c})) })});
+      const j = await r.json().catch(() => ({}));
+      if(!r.ok) throw new Error(j.erro || "Não foi possível gerar o Pix.");
+      salvar("popzin_ultimo_pedido", {id:j.id, t:j.token});
+      telaPix(j);
+    }catch(err){ telaDados(err.message); }
+  };
+}
+function resumo(){
+  const f = $("#ckForm"); if(!f) return;
+  const itens = itensCarrinho(), sub = itens.reduce((s,i)=>s+i.un*i.q,0);
+  const uf = f.uf.value, reg = uf ? regiaoPorUF(uf) : regiao;
+  const gratis = sub >= CONFIG.freteGratisAcima, frete = gratis ? 0 : (+CONFIG.fretes[reg] || 0);
+  $("#ckResumo").innerHTML = `
+    ${itens.map(i => `<div class="linha"><span>${i.q}× ${escH(i.p.nome)}${i.c?" 🔑":""}</span><span>${brl(i.un*i.q)}</span></div>`).join("")}
+    <div class="linha"><span>Frete ${uf ? `(${escH(reg)})` : "(informe o CEP)"}</span><span>${gratis ? "Grátis" : brl(frete)}</span></div>
+    <div class="linha pix"><span>Desconto Pix (${Math.round(CONFIG.descontoPix*100)}% nos produtos)</span><span>− ${brl(sub*CONFIG.descontoPix)}</span></div>
+    <div class="linha total"><b>Total no Pix</b><b>${brl(pixDe(sub)+frete)}</b></div>`;
+}
+function telaPix(p){
+  $("#ckTitulo").textContent = "Pague com Pix";
+  const fim = Date.parse(p.expiraEm);
+  $("#ckCorpo").innerHTML = `
+    <div class="ck-pix">
+      <div>Pedido <b>${escH(p.id.toUpperCase())}</b> · <b>${brl(p.total)}</b></div>
+      <div class="ck-relogio" id="ckRel">5:00</div>
+      <div style="font-size:.85rem;color:var(--suave)">para pagar antes que o Pix expire</div>
+      ${p.qrImg ? `<img alt="QR Code do Pix" src="data:image/png;base64,${p.qrImg}">` : ""}
+      <div style="font-size:.85rem">Ou copie o código e cole no app do seu banco (Pix copia e cola):</div>
+      <div class="ck-codigo" id="ckCod">${escH(p.qr)}</div>
+      <button class="btn" type="button" id="ckCopiar">📋 Copiar código Pix</button>
+      <div class="ck-aguarde"><i></i> Aguardando o pagamento… a tela muda sozinha quando cair.</div>
+    </div>`;
+  $("#ckCopiar").onclick = async () => {
+    try{ await navigator.clipboard.writeText(p.qr); toast("Código Pix copiado ✅"); }
+    catch(e){ const r = document.createRange(); r.selectNodeContents($("#ckCod")); getSelection().removeAllRanges(); getSelection().addRange(r); toast("Selecionado — copie com Ctrl+C"); }
+  };
+  clearInterval(ckTimer); clearInterval(ckPoll);
+  const tique = () => {
+    const s = Math.max(0, Math.round((fim - Date.now())/1000));
+    const el = $("#ckRel"); if(!el) return;
+    el.textContent = `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; el.classList.toggle("fim", s <= 60);
+    if(s === 0){ clearInterval(ckTimer); setTimeout(() => consultar(p, true), 1500); }
+  };
+  tique(); ckTimer = setInterval(tique, 1000);
+  ckPoll = setInterval(() => consultar(p), 4000);
+}
+async function consultar(p, final){
+  try{
+    const r = await fetch(`${API}/pedido/${p.id}?t=${p.token}`); const j = await r.json();
+    if(j.status === "pago" || j.status === "preparo" || j.status === "enviado" || j.status === "entregue") return telaPago(p, j);
+    if(j.status === "expirado" || (final && Date.now() > Date.parse(p.expiraEm) + 60000)) return telaExpirado(p);
+  }catch(e){}
+}
+function telaPago(p, j){
+  clearInterval(ckTimer); clearInterval(ckPoll);
+  carrinho = {}; salvar("popzin_carrinho", carrinho); atualizaCarrinho(); render();
+  const link = `pedido.html?id=${encodeURIComponent(p.id)}&t=${encodeURIComponent(p.token)}`;
+  $("#ckTitulo").textContent = "Pagamento confirmado";
+  $("#ckCorpo").innerHTML = `
+    <div class="ck-pix">
+      <div class="ck-ok">🎉</div>
+      <h3 style="font-family:'Baloo 2',cursive;font-size:1.5rem">Obrigado${j.primeiroNome ? `, ${escH(j.primeiroNome)}` : ""}!</h3>
+      <div>Recebemos o pagamento do pedido <b>${escH(p.id.toUpperCase())}</b>. Agora é com a gente: vamos preparar seus bichinhos com carinho.</div>
+      <a class="btn" href="${link}">📦 Acompanhar meu pedido</a>
+      <div style="font-size:.82rem;color:var(--suave)">Guarde este link: é por ele que você vê o andamento e o código de rastreio.</div>
+      <button class="btn sec" type="button" id="ckVoltar">Voltar para a loja</button>
+    </div>`;
+  $("#ckVoltar").onclick = fecharCheckout;
+}
+function telaExpirado(p){
+  clearInterval(ckTimer); clearInterval(ckPoll);
+  $("#ckTitulo").textContent = "Tempo esgotado";
+  $("#ckCorpo").innerHTML = `
+    <div class="ck-pix">
+      <div class="ck-ok">⌛</div>
+      <div>O Pix do pedido <b>${escH(p.id.toUpperCase())}</b> expirou e foi cancelado. Nenhum valor foi cobrado.</div>
+      <div style="font-size:.85rem;color:var(--suave)">Se você já pagou, não se preocupe: o pagamento é confirmado assim mesmo e aparece em <a href="pedido.html?id=${encodeURIComponent(p.id)}&t=${encodeURIComponent(p.token)}">acompanhar pedido</a>.</div>
+      <button class="btn" type="button" id="ckNovo">Gerar novo Pix ⚡</button>
+    </div>`;
+  $("#ckNovo").onclick = () => telaDados();
+}
 </script>
 </body>
 </html>

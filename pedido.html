@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Meu pedido — PopZin</title>
+<link rel="icon" type="image/png" href="img/marca/favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--cor:#7b2ff7;--cor2:#14b8e8;--amarelo:#ffc21a;--navy:#0b1030;--fundo:#f6f3ff;--texto:#1d1838;--suave:#77729a;--borda:#e6e0f7}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Nunito',sans-serif;background:var(--fundo);color:var(--texto);line-height:1.45}
+  header{background:#fff;border-bottom:1px solid var(--borda);padding:12px 18px;display:flex;align-items:center;justify-content:space-between}
+  header img{height:46px}
+  main{max-width:640px;margin:24px auto;padding:0 14px 40px;display:grid;gap:14px}
+  .cartao{background:#fff;border:1px solid var(--borda);border-radius:18px;padding:18px}
+  h1{font-family:'Baloo 2',cursive;font-size:1.6rem;line-height:1.1}
+  .sub{color:var(--suave);font-size:.9rem}
+  .passos{list-style:none;display:grid;gap:0;margin-top:6px}
+  .passos li{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start;position:relative;padding-bottom:18px}
+  .passos li:not(:last-child)::before{content:"";position:absolute;left:16px;top:32px;bottom:0;width:2px;background:var(--borda)}
+  .passos li.feito:not(:last-child)::before{background:var(--cor)}
+  .bola{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;border:2px solid var(--borda);background:#fff;font-size:1rem}
+  .feito .bola{background:var(--cor);border-color:var(--cor);color:#fff}
+  .atual .bola{border-color:var(--cor);box-shadow:0 0 0 5px rgba(123,47,247,.15)}
+  .passos b{display:block}
+  .passos small{color:var(--suave)}
+  .item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--borda);font-size:.92rem}
+  .total{display:flex;justify-content:space-between;font-weight:800;padding-top:8px}
+  .rastreio{background:#e3f0ff;border-radius:12px;padding:12px;font-size:.92rem}
+  .rastreio code{font-size:1.05rem;font-weight:800}
+  .btn{display:inline-block;background:var(--cor);color:#fff;border-radius:12px;padding:10px 16px;font-weight:800;text-decoration:none;border:none;cursor:pointer;font-family:inherit}
+  .btn.sec{background:#fff;color:var(--texto);border:1px solid var(--borda)}
+  .aviso{background:#fff4d6;border-radius:12px;padding:12px;font-size:.92rem}
+  .erro{background:#fdecec;color:#b33;border-radius:12px;padding:12px}
+</style>
+</head>
+<body>
+<header><a href="index.html"><img src="img/marca/logo-texto.webp" alt="PopZin"></a><a class="btn sec" href="index.html">Voltar à loja</a></header>
+<main id="conteudo"><div class="cartao">Carregando seu pedido…</div></main>
+<script src="config.js?v=4"></script>
+<script>
+const API = ((window.POPZIN_CHECKOUT||{}).api||"").replace(/\/+$/,"");
+const q = new URLSearchParams(location.search), id = q.get("id"), t = q.get("t");
+const brl = v => (+v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const dataBR = iso => iso ? new Date(iso).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
+const PASSOS = [
+  ["aguardando","⏳","Aguardando pagamento","Pague o Pix para confirmar o pedido"],
+  ["pago","✅","Pagamento confirmado","Recebemos seu pagamento"],
+  ["preparo","🛠️","Em preparo","Seus bichinhos estão sendo impressos e embalados"],
+  ["enviado","📦","Enviado","A caminho do seu endereço"],
+  ["entregue","🏠","Entregue","Aproveite! 🐾"],
+];
+async function carregar(){
+  const el = document.getElementById("conteudo");
+  if(!API || !id || !t){ el.innerHTML = `<div class="cartao erro">Link de pedido inválido. Use o link recebido ao finalizar a compra.</div>`; return; }
+  try{
+    const r = await fetch(`${API}/pedido/${encodeURIComponent(id)}?t=${encodeURIComponent(t)}`);
+    const p = await r.json();
+    if(!r.ok) throw new Error(p.erro || "Pedido não encontrado.");
+    const idx = PASSOS.findIndex(s => s[0] === p.status);
+    const quando = st => (p.historico||[]).filter(h => h.status === st).map(h => dataBR(h.em)).pop() || "";
+    const expirado = p.status === "expirado", cancelado = p.status === "cancelado";
+    el.innerHTML = `
+      <div class="cartao">
+        <h1>${p.primeiroNome ? `Olá, ${esc(p.primeiroNome)}!` : "Seu pedido"}</h1>
+        <div class="sub">Pedido <b>${esc(id.toUpperCase())}</b> · feito em ${dataBR(p.criado)}</div>
+      </div>
+      ${expirado ? `<div class="aviso">⌛ O Pix deste pedido expirou sem pagamento e foi cancelado. Nada foi cobrado. <a href="index.html">Voltar à loja</a> para fazer um novo pedido.</div>` : ""}
+      ${cancelado ? `<div class="aviso">Este pedido foi cancelado. Dúvidas? Fale com a gente pelo WhatsApp.</div>` : ""}
+      ${!expirado && !cancelado ? `<div class="cartao"><ol class="passos">${PASSOS.map((s,i) => `
+        <li class="${i < idx ? "feito" : i === idx ? "feito atual" : ""}">
+          <span class="bola">${i <= idx ? s[1] : ""}</span>
+          <span><b>${s[2]}</b><small>${i <= idx ? (quando(s[0]) || s[3]) : s[3]}</small></span>
+        </li>`).join("")}</ol>
+        ${p.rastreio ? `<div class="rastreio">📦 Código de rastreio: <code>${esc(p.rastreio)}</code><br><a href="https://rastreamento.correios.com.br/app/index.php?objetos=${encodeURIComponent(p.rastreio)}" target="_blank" rel="noopener">Rastrear nos Correios ↗</a></div>` : ""}
+        ${p.status === "aguardando" && p.qr ? `<div class="aviso" style="margin-top:10px">Ainda falta pagar. Código Pix (copia e cola):<br><code style="word-break:break-all;font-size:.75rem">${esc(p.qr)}</code></div>` : ""}
+      </div>` : ""}
+      <div class="cartao">
+        <b>Itens</b>
+        ${(p.itens||[]).map(i => `<div class="item"><span>${i.q}× ${esc(i.nome)}${i.chaveiro ? " 🔑" : ""}</span><span>${brl(i.un*i.q)}</span></div>`).join("")}
+        <div class="item"><span>Frete${p.regiao ? ` (${esc(p.regiao)})` : ""}</span><span>${p.frete ? brl(p.frete) : "Grátis"}</span></div>
+        <div class="total"><span>Total pago no Pix</span><span>${brl(p.total)}</span></div>
+      </div>
+      <div class="sub" style="text-align:center">Esta página atualiza sozinha. Guarde o link para acompanhar.</div>`;
+  }catch(e){ el.innerHTML = `<div class="cartao erro">${esc(e.message)}</div>`; }
+}
+carregar(); setInterval(carregar, 30000);
+</script>
+</body>
+</html>

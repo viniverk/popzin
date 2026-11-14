@@ -77,7 +77,7 @@
   .rank .bar{grid-column:1/-1;height:6px;border-radius:99px;background:var(--fundo);overflow:hidden;margin-bottom:6px}
   .rank .bar i{display:block;height:100%;background:var(--cor)}
   .st{border-radius:8px;padding:4px 6px;font-size:.82rem;width:auto}
-  .st-novo{background:#fff4d6}.st-pago{background:#e2f6ee}.st-enviado{background:#e3f0ff}.st-cancelado{background:#f4f1f1;color:#999}
+  .st-novo,.st-aguardando{background:#fff4d6}.st-pago{background:#e2f6ee}.st-preparo{background:#efe6ff}.st-enviado{background:#e3f0ff}.st-entregue{background:#e6f6f3}.st-cancelado,.st-expirado{background:#f4f1f1;color:#999}
   .vazio-v{color:var(--suave);font-size:.9rem;padding:10px 0}
   .fretes-linha{display:grid;grid-template-columns:1fr 120px 40px;gap:8px}
 
@@ -258,7 +258,7 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=3"></script>
+<script src="config.js?v=4"></script>
 <script>
 /* =========================================================
    Painel PopZin — salva direto no repositório via API do GitHub.
@@ -656,7 +656,12 @@ function mostrarImportar(){
 }
 
 /* ---------- 📊 Vendas: lê eventos (visitas/carrinho) e pedidos do Firestore ---------- */
-const STATUS = {novo:"🟡 Novo", pago:"🟢 Pago", enviado:"📦 Enviado", cancelado:"⚪ Cancelado"};
+const STATUS = {novo:"🟡 Novo (WhatsApp)", aguardando:"⏳ Aguardando Pix", pago:"✅ Pago", preparo:"🛠️ Em preparo",
+                enviado:"📦 Enviado", entregue:"🏠 Entregue", expirado:"⌛ Expirado", cancelado:"⚪ Cancelado"};
+const CONTA = ["pago","preparo","enviado","entregue"];            // estados que contam como venda
+const opcoesStatus = p => p.origem === "site"
+  ? ["aguardando","pago","preparo","enviado","entregue","expirado","cancelado"]
+  : ["novo","pago","preparo","enviado","entregue","cancelado"];
 async function fsConsulta(colecao, desde){
   const r = await fetch(`${FS}:runQuery`, {method:"POST", headers:{Authorization:`Bearer ${await fbToken()}`, "Content-Type":"application/json"},
     body:JSON.stringify({structuredQuery:{from:[{collectionId:colecao}],
@@ -666,8 +671,8 @@ async function fsConsulta(colecao, desde){
   if(!r.ok) throw new Error(`Firebase ${r.status}`);
   return (await r.json()).filter(x => x.document).map(({document:d}) => {
     let json = {}; try{ json = JSON.parse(d.fields.json?.stringValue || "{}"); }catch(e){}
-    return {id:d.name.split("/").pop(), criado:new Date(d.fields.criado?.timestampValue || d.createTime),
-            tipo:d.fields.tipo?.stringValue, status:d.fields.status?.stringValue || "novo", ...json};
+    return {...json, id:d.name.split("/").pop(), criado:new Date(d.fields.criado?.timestampValue || d.createTime),
+            tipo:d.fields.tipo?.stringValue, status:d.fields.status?.stringValue || "novo"};
   });
 }
 let vendasCache = null;
@@ -693,8 +698,8 @@ function rankHTML(pares, fmt = v => v){
 function desenharVendas(){
   const {eventos, pedidos, dias, desde} = vendasCache;
   const visitas = eventos.filter(e => e.tipo === "visita"), carrinhos = eventos.filter(e => e.tipo === "carrinho");
-  const validos = pedidos.filter(p => p.status !== "cancelado");
-  const confirmados = pedidos.filter(p => p.status === "pago" || p.status === "enviado");
+  const validos = pedidos.filter(p => p.status !== "cancelado" && p.status !== "expirado");
+  const confirmados = pedidos.filter(p => CONTA.includes(p.status));
   const fat = confirmados.reduce((s,p) => s + (+p.total||0), 0);
   const ticket = confirmados.length ? fat/confirmados.length : (validos.length ? validos.reduce((s,p)=>s+(+p.total||0),0)/validos.length : 0);
   const conv = visitas.length ? validos.length/visitas.length*100 : 0;
@@ -732,36 +737,60 @@ function desenharVendas(){
   $("#vOrigens").innerHTML = rankHTML(Object.entries(og).sort((a,b)=>b[1]-a[1]), v => `${v}`);
 
   // pedidos
-  $("#vPedidos").innerHTML = pedidos.length ? `<table><thead><tr><th>Quando</th><th>Itens</th><th>Total</th><th>Região</th><th>Andamento</th></tr></thead><tbody>${
-    pedidos.map(p => `<tr>
-      <td>${p.criado.toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",timeZone:"America/Sao_Paulo"})}</td>
+  const fila = pedidos.filter(p => p.status === "pago").length;
+  $("#vPedidos").innerHTML = (fila ? `<div class="msg ok" style="margin-bottom:10px">✅ ${fila} pedido(s) pago(s) esperando preparo.</div>` : "") +
+    (pedidos.length ? `<table><thead><tr><th>Quando</th><th>Cliente</th><th>Itens</th><th>Total</th><th>Andamento</th></tr></thead><tbody>${
+    pedidos.map(p => { const c = p.cliente || {}; return `<tr>
+      <td>${p.criado.toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",timeZone:"America/Sao_Paulo"})}<br><small style="color:var(--suave)">${p.origem==="site" ? `⚡ Pix no site<br>${esc((p.id||"").toUpperCase())}` : "💬 WhatsApp"}</small></td>
+      <td>${c.nome ? `<b>${esc(c.nome)}</b><br><a href="https://wa.me/55${esc((c.telefone||"").replace(/^55/,""))}" target="_blank" rel="noopener">${esc(c.telefone||"")}</a>
+          <details><summary style="cursor:pointer;color:var(--suave);font-size:.8rem">endereço e CPF</summary><small>${esc(c.rua)}, ${esc(c.numero)}${c.complemento?` — ${esc(c.complemento)}`:""}<br>${esc(c.bairro)} · ${esc(c.cidade)}/${esc(c.uf)}<br>CEP ${esc(c.cep)} · CPF ${esc(c.cpf)}<br>${esc(c.email)}</small></details>`
+        : `<small style="color:var(--suave)">${esc(p.regiao||"")}</small>`}</td>
       <td>${(p.itens||[]).map(i => `${i.q}× ${esc(i.nome)}${i.chaveiro?" 🔑":""}`).join("<br>")}${p.obs?`<br><small style="color:var(--suave)">“${esc(p.obs)}”</small>`:""}</td>
-      <td><b>${brl(p.total)}</b><br><small style="color:var(--suave)">Pix ${brl(p.totalPix)}</small></td>
-      <td><small>${esc(p.regiao||"")}${p.freteGratis?"<br>frete grátis":""}</small></td>
-      <td><select class="st st-${p.status}" data-pedido="${p.id}">${Object.entries(STATUS).map(([k,v])=>`<option value="${k}" ${k===p.status?"selected":""}>${v}</option>`).join("")}</select></td>
-    </tr>`).join("")}</tbody></table>` : `<div class="vazio-v">Nenhum pedido no período.</div>`;
+      <td><b>${brl(p.total)}</b><br><small style="color:var(--suave)">${p.origem==="site" ? `frete ${p.frete ? brl(p.frete) : "grátis"}` : `Pix ${brl(p.totalPix)}`}</small></td>
+      <td><select class="st st-${p.status}" data-pedido="${p.id}">${opcoesStatus(p).map(k=>`<option value="${k}" ${k===p.status?"selected":""}>${STATUS[k]}</option>`).join("")}</select>
+        ${p.origem==="site" && ["enviado","entregue"].includes(p.status) ? `<div style="margin-top:6px;display:flex;gap:4px"><input class="st" style="width:120px" placeholder="rastreio" value="${esc(p.rastreio||"")}" data-rastreio="${p.id}"><button class="btn sec" style="padding:4px 8px;font-size:.8rem" data-salvarrastreio="${p.id}">ok</button></div>` : ""}</td>
+    </tr>`; }).join("")}</tbody></table>` : `<div class="vazio-v">Nenhum pedido no período.</div>`);
 }
+/* grava status/rastreio no pedido mantendo o histórico (o cliente vê na página do pedido) */
+async function gravarPedido(id, mudar){
+  const d = await fs(`pedidos/${id}`);
+  let dados = {}; try{ dados = JSON.parse(d.fields.json.stringValue); }catch(e){}
+  const antes = d.fields.status?.stringValue || "novo";
+  const {status = antes, rastreio} = mudar;
+  if(rastreio !== undefined) dados.rastreio = rastreio.trim().toUpperCase().slice(0,40);
+  if(status !== antes) dados.historico = [...(dados.historico||[]), {status, em:new Date().toISOString()}];
+  await fs(`pedidos/${id}?updateMask.fieldPaths=status&updateMask.fieldPaths=json`, {method:"PATCH",
+    body:JSON.stringify({fields:{status:{stringValue:status}, json:{stringValue:JSON.stringify(dados)}}})});
+  return {antes, dados};
+}
+$("#vPedidos").onclick = async e => {
+  const b = e.target.closest("[data-salvarrastreio]"); if(!b) return;
+  const id = b.dataset.salvarrastreio, val = $(`[data-rastreio="${id}"]`).value;
+  try{ await gravarPedido(id, {rastreio: val}); const p = vendasCache.pedidos.find(x => x.id === id); if(p) p.rastreio = val.trim().toUpperCase(); toast("Rastreio salvo — o cliente já vê na página do pedido ✅"); }
+  catch(err){ toast(err.message, true); }
+};
 $("#vPedidos").onchange = async e => {
   const s = e.target.closest("[data-pedido]"); if(!s) return;
   const id = s.dataset.pedido, novo = s.value;
-  const ped = vendasCache.pedidos.find(x => x.id === id), antes = ped?.status || "novo";
-  const conta = st => st === "pago" || st === "enviado";
+  const ped = vendasCache.pedidos.find(x => x.id === id);
   try{
-    await fs(`pedidos/${id}?updateMask.fieldPaths=status`, {method:"PATCH", body:JSON.stringify({fields:{status:{stringValue:novo}}})});
+    const {antes} = await gravarPedido(id, {status: novo});
     if(ped) ped.status = novo;
-    // atualiza "vendidos" dos produtos quando o pedido entra ou sai de pago/enviado
-    const sinal = conta(novo) && !conta(antes) ? 1 : !conta(novo) && conta(antes) ? -1 : 0;
+    // vendidos (e, nos pedidos do site, o estoque) acompanham a entrada/saída dos estados de venda
+    const sinal = CONTA.includes(novo) && !CONTA.includes(antes) ? 1 : !CONTA.includes(novo) && CONTA.includes(antes) ? -1 : 0;
     if(sinal && ped){
       const atual = await BD.lerProdutos();
       for(const it of (ped.itens||[])){
         const prod = atual.find(x => x.id == it.id); if(!prod) continue;
         prod.vendidos = Math.max(0, (+prod.vendidos||0) + sinal*(+it.q||0));
+        if(ped.origem === "site") prod.estoque = Math.max(0, (+prod.estoque||0) - sinal*(+it.q||0));
         await BD.salvarProduto(prod);
-        const loc = produtos.find(x => x.id == prod.id); if(loc) loc.vendidos = prod.vendidos;
+        const loc = produtos.find(x => x.id == prod.id); if(loc){ loc.vendidos = prod.vendidos; loc.estoque = prod.estoque; }
       }
       renderTabela();
     }
-    desenharVendas(); toast(sinal > 0 ? "Pedido confirmado ✅ — vendidos atualizados" : sinal < 0 ? "Pedido atualizado — vendidos descontados" : "Pedido atualizado ✅");
+    desenharVendas();
+    toast(sinal > 0 ? "Venda confirmada ✅ — vendidos atualizados" : sinal < 0 ? "Pedido saiu das vendas — vendidos descontados" : `Pedido: ${STATUS[novo]} ✅`);
   }catch(err){ toast(err.message, true); }
 };
 

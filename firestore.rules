@@ -35,16 +35,17 @@ service cloud.firestore {
       allow read, delete: if ehAdmin();
     }
 
-    // pedidos enviados pelo WhatsApp: o site só cria; o administrador lê e muda o andamento
+    // pedidos: o site só cria os do WhatsApp; o administrador lê e muda o andamento e o rastreio
     match /pedidos/{id} {
       allow create: if request.resource.data.keys().hasOnly(['criado', 'status', 'json'])
         && request.resource.data.status == 'novo'
         && request.resource.data.json is string && request.resource.data.json.size() < 6000
         && criadoAgora();
       allow read, delete: if ehAdmin();
+      // pedidos pagos no site são criados pelo servidor (worker), que não passa por estas regras
       allow update: if ehAdmin()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
-        && request.resource.data.status in ['novo', 'pago', 'enviado', 'cancelado'];
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'json'])
+        && request.resource.data.status in ['novo', 'aguardando', 'pago', 'preparo', 'enviado', 'entregue', 'expirado', 'cancelado'];
     }
 
     // qualquer outra coisa: bloqueado
