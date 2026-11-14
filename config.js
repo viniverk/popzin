@@ -11,5 +11,5 @@ window.POPZIN_FIREBASE = {
 /* Servidor de pagamentos (Cloudflare Worker). Endereço do worker, ex.: https://popzin-api.seunome.workers.dev
    Em branco = o checkout com Pix fica escondido e a loja segue só com o pedido pelo WhatsApp. */
 window.POPZIN_CHECKOUT = {
-  api: ""
+  api: "https://popzin-api.discipulos-pagamento.workers.dev"
 };
