@@ -187,7 +187,16 @@ function calcular(itensPedidos, produtos, cfg, uf) {
     const combo = +p.promoQtd >= 2 && +p.promoPreco > 0 && +p.promoPreco < +p.preco && total >= +p.promoQtd;
     const chav = !!it.chaveiro && precoChav > 0 && !p.semChaveiro;
     const un = r2((combo ? +p.promoPreco : +p.preco) + (chav ? precoChav : 0));
-    itens.push({ id: +p.id, nome: p.nome, q, chaveiro: chav, combo, un });
+    // variação de cor (opcional): precisa existir no produto e não estar esgotada
+    const cores = Array.isArray(p.cores) ? p.cores : [];
+    let cor = "";
+    if (cores.length) {
+      const c = cores.find(x => x.id === String(it.cor || ""));
+      if (!c) throw erroPublico(`Escolha a cor de ${p.nome}. Atualize a página.`);
+      if (c.esgotado) throw erroPublico(`${p.nome} na cor ${c.nome} esgotou. Escolha outra cor.`);
+      cor = String(c.nome).slice(0, 40);
+    }
+    itens.push({ id: +p.id, nome: p.nome + (cor ? ` — ${cor}` : ""), q, chaveiro: chav, combo, un, ...(cor ? { cor } : {}) });
   }
   const sub = r2(itens.reduce((s, i) => s + i.un * i.q, 0));
   const regiao = regiaoPorUF(cfg.fretes, uf);

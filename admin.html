@@ -93,6 +93,8 @@
   @media(max-width:640px){
     .foto-area{grid-template-columns:1fr}
     .col-colecao,.col-estoque,.col-tipo{display:none}
+    .linha-cor{grid-template-columns:46px 1fr auto 40px!important}
+    .linha-cor .c-foto{grid-column:1/-1;order:5}
     .tipo-mob{display:block!important}
   }
 </style>
@@ -287,6 +289,13 @@
       <label>🔥 Preço no combo (R$ cada)<input id="pPromoPreco" type="number" min="0" step="0.01" placeholder="ex.: 9.90"></label>
       <label>Emoji (sem foto)<input id="pEmoji" maxlength="8" placeholder="🐙"></label>
       <label>Cor de fundo<input id="pCor" type="color" value="#f1ebff" style="height:42px;padding:4px"></label>
+    </div>
+
+    <div>
+      <label style="margin-bottom:4px">🎨 Cores (opcional)</label>
+      <div class="ajuda" style="margin-bottom:8px">Se o produto tem várias cores, cadastre cada uma com a foto daquela cor. Na loja aparecem bolinhas de cor e a foto muda ao escolher. A primeira cor é a que aparece primeiro.</div>
+      <div id="pCores" style="display:grid;gap:8px"></div>
+      <button type="button" class="btn sec" id="btnAddCor" style="margin-top:8px">+ cor</button>
     </div>
 
     <div class="checks">
@@ -602,9 +611,39 @@ function abrirModal(p){
   $("#pPreco").value = p?.preco ?? ""; $("#pDe").value = p?.de || ""; $("#pEstoque").value = p?.estoque ?? 0;
   $("#pVendidos").value = p?.vendidos ?? 0; $("#pPromoQtd").value = p?.promoQtd || ""; $("#pPromoPreco").value = p?.promoPreco || ""; $("#pEmoji").value = p?.emoji || ""; $("#pCor").value = p?.cor || "#f1ebff";
   $("#pChav").checked = !p?.semChaveiro; $("#pNovo").checked = !!p?.novo; $("#pDestaque").checked = !!p?.destaque; $("#pFoto").value = ""; $("#pFotoUrl").value = p?.foto || "";
+  montarCores(p);
   atualizaPreview();
   $("#modal").classList.remove("oculto");
 }
+/* ---------- variações de cor do produto ---------- */
+const CORES_SUGERIDAS = {vermelho:"#e53935", laranja:"#fb8c00", amarelo:"#fdd835", verde:"#43a047", azul:"#1e88e5", roxo:"#8e24aa", rosa:"#ec407a", preto:"#212121", branco:"#fafafa", cinza:"#9e9e9e", marrom:"#795548", dourado:"#d4af37", prata:"#c0c0c0", lilás:"#b39ddb", turquesa:"#26c6da"};
+function linhaCor(c = {}){
+  const d = document.createElement("div"); d.className = "fretes-linha linha-cor"; d.style.gridTemplateColumns = "46px 1fr 1.6fr auto 40px";
+  d.dataset.id = c.id || "";
+  d.innerHTML = `<input type="color" class="c-hex" value="${esc(c.hex || "#8e24aa")}" style="height:40px;padding:3px" aria-label="Cor">
+    <input class="c-nome" placeholder="Nome (ex.: Laranja)" value="${esc(c.nome || "")}" list="sugCores">
+    <input class="c-foto" type="url" placeholder="Link da foto nessa cor (Imgur)" value="${esc(c.foto || "")}">
+    <label style="display:flex;align-items:center;gap:4px;font-size:.8rem;white-space:nowrap"><input type="checkbox" class="c-esg" ${c.esgotado ? "checked" : ""}> esgotada</label>
+    <button type="button" class="btn sec" title="Remover cor">✕</button>`;
+  d.querySelector("button").onclick = () => d.remove();
+  d.querySelector(".c-nome").addEventListener("change", e => { const h = CORES_SUGERIDAS[e.target.value.trim().toLowerCase()]; if(h && !c.hex) d.querySelector(".c-hex").value = h; });
+  $("#pCores").appendChild(d);
+}
+function montarCores(p){ $("#pCores").innerHTML = ""; (p?.cores || []).forEach(linhaCor); }
+function lerCores(){
+  const linhas = [...document.querySelectorAll("#pCores .linha-cor")], usados = new Set(), out = [];
+  for(const d of linhas){
+    const nome = d.querySelector(".c-nome").value.trim(), foto = d.querySelector(".c-foto").value.trim();
+    if(!nome && !foto) continue;
+    if(!nome) return null;
+    let id = d.dataset.id || slug(nome), base = id, k = 2; while(usados.has(id)) id = `${base}-${k++}`; usados.add(id);
+    out.push({id, nome, hex: d.querySelector(".c-hex").value, foto: foto ? normalizarFoto(foto) : "", esgotado: d.querySelector(".c-esg").checked});
+  }
+  return out;
+}
+$("#btnAddCor").onclick = () => { linhaCor(); document.querySelector("#pCores .linha-cor:last-child .c-nome")?.focus(); };
+document.body.insertAdjacentHTML("beforeend", `<datalist id="sugCores">${Object.keys(CORES_SUGERIDAS).map(n => `<option value="${n[0].toUpperCase()+n.slice(1)}">`).join("")}</datalist>`);
+
 function fecharModal(){ $("#modal").classList.add("oculto"); }
 $("#btnCancelar").onclick = fecharModal;
 $("#modal").onclick = e => { if(e.target.id==="modal") fecharModal(); };
@@ -653,6 +692,9 @@ $("#formProduto").onsubmit = async e => {
       emoji:$("#pEmoji").value.trim(), cor:$("#pCor").value, novo:$("#pNovo").checked, destaque:$("#pDestaque").checked, semChaveiro:!$("#pChav").checked,
       foto: editando?.foto || "", atualizado: Date.now()
     };
+    const cores = lerCores();
+    if(cores === null) throw new Error("Toda cor precisa de um nome.");
+    if(cores.length) p.cores = cores; else delete p.cores;
     const fotoAntiga = editando?.foto || "";
     if(modoFB){ p.foto = normalizarFoto($("#pFotoUrl").value); }
     else if(novaFoto){
