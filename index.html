@@ -477,7 +477,7 @@ async function iniciar(){
   }
   PRODUTOS.forEach(p => { p.preco=+p.preco||0; p.de=+p.de||0; p.estoque=+p.estoque||0; p.vendidos=+p.vendidos||0; });
   carrinho = Object.fromEntries(Object.entries(carrinho).filter(([k]) => { const {id, cor} = lerChave(k), p = PRODUTOS.find(x => x.id === id);
-    if(!p) return false; const cs = coresDe(p); return cs.length ? cs.some(c => c.id === cor && !c.esgotado) : !cor; }));
+    if(!p) return false; const cs = coresDe(p); return cs.length ? cs.some(c => c.id === cor && !semCor(c)) : !cor; }));
   if(!CONFIG.fretes[regiao]) regiao = Object.keys(CONFIG.fretes)[0];
   montarTela();
   render();
@@ -559,9 +559,13 @@ const lerChave = k => { const [base, cor = ""] = String(k).split("@"); const [id
 /* variações de cor (opcional): p.cores = [{id, nome, hex, foto, esgotado}] */
 const coresDe = p => Array.isArray(p.cores) ? p.cores.filter(c => c && c.id && c.nome) : [];
 const corDe = (p, id) => coresDe(p).find(c => c.id === id) || null;
+const estoqueCor = c => !c ? Infinity : c.esgotado ? 0 : (c.estoque === undefined || c.estoque === null || c.estoque === "" ? Infinity : Math.max(0, +c.estoque || 0));
+const semCor = c => estoqueCor(c) <= 0;
+const qtdDaCor = (id, cor) => Object.entries(carrinho).reduce((s,[k,q]) => { const l = lerChave(k); return s + (l.id === id && l.cor === cor ? q : 0); }, 0);
+const podeMais = (p, cor) => qtdNoCarrinho(p.id) < p.estoque && (!cor || qtdDaCor(p.id, cor) < estoqueCor(corDe(p, cor)));
 const fotoDe = (p, corId) => corDe(p, corId)?.foto || p.foto || "";
 const corSel = {};                                                  // cor escolhida em cada card
-const corInicial = p => { const cs = coresDe(p); if(!cs.length) return ""; if(corSel[p.id] && cs.some(c => c.id === corSel[p.id] && !c.esgotado)) return corSel[p.id]; return (cs.find(c => !c.esgotado) || cs[0]).id; };
+const corInicial = p => { const cs = coresDe(p); if(!cs.length) return ""; if(corSel[p.id] && cs.some(c => c.id === corSel[p.id] && !semCor(c))) return corSel[p.id]; return (cs.find(c => !semCor(c)) || cs[0]).id; };
 const qtdNoCarrinho = id => Object.entries(carrinho).reduce((s,[k,q]) => s + (lerChave(k).id===id ? q : 0), 0);
 /* combo: "a partir de N unidades, R$ X cada" (promoQtd / promoPreco no produto) */
 const temCombo = p => +p.promoQtd >= 2 && +p.promoPreco > 0 && +p.promoPreco < p.preco;
@@ -582,7 +586,7 @@ function card(p){
     <div class="info">
       <div class="colecao">${p.colecao}</div>
       <div class="nome">${p.nome}</div>
-      ${cs.length ? `<div class="cores" role="radiogroup" aria-label="Cor">${cs.map(c => `<button type="button" class="cor-bola${c.id===cAtual?" on":""}${c.esgotado?" esg":""}" data-cor="${p.id}:${c.id}" title="${escH(c.nome)}${c.esgotado?" (esgotada)":""}" aria-label="${escH(c.nome)}" style="--c:${escH(c.hex||"#ccc")}" ${c.esgotado?"disabled":""}></button>`).join("")}<span class="cor-nome" data-cor-nome="${p.id}">${escH(corDe(p,cAtual)?.nome||"")}</span></div>` : ""}
+      ${cs.length ? `<div class="cores" role="radiogroup" aria-label="Cor">${cs.map(c => `<button type="button" class="cor-bola${c.id===cAtual?" on":""}${semCor(c)?" esg":""}" data-cor="${p.id}:${c.id}" title="${escH(c.nome)}${semCor(c)?" (esgotada)":""}" aria-label="${escH(c.nome)}" style="--c:${escH(c.hex||"#ccc")}" ${semCor(c)?"disabled":""}></button>`).join("")}<span class="cor-nome" data-cor-nome="${p.id}">${escH(corDe(p,cAtual)?.nome||"")}</span></div>` : ""}
       <div class="precos">
         ${p.de?`<span class="de">${brl(p.de)}</span>`:""}<span class="preco">${brl(p.preco)}</span>
         <div class="pix">${brl(pixDe(p.preco))} no Pix</div>
@@ -598,7 +602,7 @@ function card(p){
 
 $("#grade").onclick = e => {
   const sw = e.target.closest("[data-cor]");
-  if(sw){ const [pid, cid] = sw.dataset.cor.split(":"), p = PRODUTOS.find(x => x.id === +pid), c = corDe(p, cid); if(!c || c.esgotado) return;
+  if(sw){ const [pid, cid] = sw.dataset.cor.split(":"), p = PRODUTOS.find(x => x.id === +pid), c = corDe(p, cid); if(!c || semCor(c)) return;
     corSel[p.id] = cid; const cardEl = sw.closest(".card");
     cardEl.querySelectorAll(".cor-bola").forEach(b => b.classList.toggle("on", b === sw));
     cardEl.querySelector(`[data-cor-nome="${p.id}"]`).textContent = c.nome;
@@ -609,8 +613,8 @@ $("#grade").onclick = e => {
   if(f){ const id=+f.dataset.fav; favs = favs.includes(id) ? favs.filter(x=>x!==id) : [...favs,id]; salvar("popzin_favs",favs); render(); }
   if(a){ const id=+a.dataset.add, p=PRODUTOS.find(x=>x.id===id);
     const cb = a.closest(".info").querySelector("[data-chav]"); const c = !!cb?.checked;
-    if(qtdNoCarrinho(id) >= p.estoque) return toast("Estoque máximo atingido");
     const cor = corInicial(p);
+    if(!podeMais(p, cor)) return toast(cor && qtdNoCarrinho(id) < p.estoque ? `Acabou o estoque da cor ${corDe(p,cor)?.nome} — escolha outra cor` : "Estoque máximo atingido");
     const k = chave(id, c, cor); carrinho[k]=(carrinho[k]||0)+1; salvar("popzin_carrinho",carrinho); atualizaCarrinho();
     registrar("carrinho", {id, nome:p.nome + (cor ? ` — ${corDe(p,cor)?.nome}` : "")});
     abrir(true); }
@@ -710,7 +714,7 @@ $("#grade").onchange = e => {
 $("#gItens").onclick = e => {
   const m=e.target.closest("[data-mais]"), n=e.target.closest("[data-menos]");
   if(!m && !n) return;
-  if(m){ const k=m.dataset.mais, {id}=lerChave(k), p=PRODUTOS.find(x=>x.id===id); if(qtdNoCarrinho(id)<p.estoque) carrinho[k]++; else toast("Estoque máximo atingido"); }
+  if(m){ const k=m.dataset.mais, {id,cor}=lerChave(k), p=PRODUTOS.find(x=>x.id===id); if(podeMais(p, cor)) carrinho[k]++; else toast("Estoque máximo atingido"); }
   if(n){ const k=n.dataset.menos; carrinho[k]--; if(carrinho[k]<=0) delete carrinho[k]; }
   salvar("popzin_carrinho",carrinho); atualizaCarrinho();
 };

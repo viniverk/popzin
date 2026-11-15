@@ -293,7 +293,7 @@
 
     <div>
       <label style="margin-bottom:4px">🎨 Cores (opcional)</label>
-      <div class="ajuda" style="margin-bottom:8px">Se o produto tem várias cores, cadastre cada uma com a foto daquela cor. Na loja aparecem bolinhas de cor e a foto muda ao escolher. A primeira cor é a que aparece primeiro.</div>
+      <div class="ajuda" style="margin-bottom:8px">Se o produto tem várias cores, cadastre cada uma com a foto e o estoque daquela cor. Na loja aparecem bolinhas de cor e a foto muda ao escolher. Cor com estoque 0 aparece riscada. O estoque do produto vira a soma das cores.</div>
       <div id="pCores" style="display:grid;gap:8px"></div>
       <button type="button" class="btn sec" id="btnAddCor" style="margin-top:8px">+ cor</button>
     </div>
@@ -594,7 +594,7 @@ function renderTabela(){
       <td class="col-tipo">${(t => t ? `${esc(t.emoji||"")} ${esc(t.nome)}` : esc(p.tipo||"—"))(tiposLoja().find(t => t.id === p.tipo))}</td>
       <td class="col-colecao">${esc(p.colecao||"")}</td>
       <td>${brl(p.preco)}${+p.de?`<br><s style="color:var(--suave);font-size:.8rem">${brl(p.de)}</s>`:""}</td>
-      <td class="col-estoque">${+p.estoque||0}</td>
+      <td class="col-estoque">${+p.estoque||0}${(p.cores||[]).length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${p.cores.map(c => `<span title="${esc(c.nome)}" style="display:inline-flex;align-items:center;gap:3px;font-size:.72rem;color:${(c.esgotado||+c.estoque===0)?"#c62828":"var(--suave)"}"><i style="width:10px;height:10px;border-radius:50%;background:${esc(c.hex||"#ccc")};display:inline-block;box-shadow:0 0 0 1px #ddd"></i>${c.esgotado ? 0 : (c.estoque ?? "?")}</span>`).join("")}</div>` : ""}</td>
       <td><div class="acoes"><button class="btn sec" data-editar="${p.id}">Editar</button></div></td>
     </tr>`).join("") : `<tr><td colspan="7" style="text-align:center;color:var(--suave);padding:30px">Nenhum produto ainda. Clique em “+ Novo produto”.</td></tr>`;
 
@@ -623,25 +623,35 @@ function linhaCor(c = {}){
   d.innerHTML = `<input type="color" class="c-hex" value="${esc(c.hex || "#8e24aa")}" style="height:40px;padding:3px" aria-label="Cor">
     <input class="c-nome" placeholder="Nome (ex.: Laranja)" value="${esc(c.nome || "")}" list="sugCores">
     <input class="c-foto" type="url" placeholder="Link da foto nessa cor (Imgur)" value="${esc(c.foto || "")}">
-    <label style="display:flex;align-items:center;gap:4px;font-size:.8rem;white-space:nowrap"><input type="checkbox" class="c-esg" ${c.esgotado ? "checked" : ""}> esgotada</label>
+    <input class="c-est" type="number" min="0" step="1" placeholder="Estoque" title="Estoque desta cor" aria-label="Estoque desta cor" value="${c.esgotado ? 0 : (c.estoque ?? "")}" style="width:84px">
     <button type="button" class="btn sec" title="Remover cor">✕</button>`;
-  d.querySelector("button").onclick = () => d.remove();
+  d.querySelector("button").onclick = () => { d.remove(); somaEstoqueCores(); };
+  d.querySelector(".c-est").addEventListener("input", somaEstoqueCores);
   d.querySelector(".c-nome").addEventListener("change", e => { const h = CORES_SUGERIDAS[e.target.value.trim().toLowerCase()]; if(h && !c.hex) d.querySelector(".c-hex").value = h; });
   $("#pCores").appendChild(d);
 }
-function montarCores(p){ $("#pCores").innerHTML = ""; (p?.cores || []).forEach(linhaCor); }
+function montarCores(p){ $("#pCores").innerHTML = ""; (p?.cores || []).forEach(linhaCor); somaEstoqueCores(); }
+/* com cores, o estoque do produto é a soma das cores (campo fica travado) */
+function somaEstoqueCores(){
+  const ests = [...document.querySelectorAll("#pCores .c-est")], el = $("#pEstoque");
+  if(!ests.length){ el.readOnly = false; el.title = ""; el.style.background = ""; return; }
+  el.value = ests.reduce((s,i) => s + (Math.floor(+i.value) || 0), 0);
+  el.readOnly = true; el.title = "Soma do estoque das cores"; el.style.background = "#f3effc";
+}
 function lerCores(){
   const linhas = [...document.querySelectorAll("#pCores .linha-cor")], usados = new Set(), out = [];
   for(const d of linhas){
     const nome = d.querySelector(".c-nome").value.trim(), foto = d.querySelector(".c-foto").value.trim();
     if(!nome && !foto) continue;
-    if(!nome) return null;
+    if(!nome) return {erro: "Toda cor precisa de um nome."};
     let id = d.dataset.id || slug(nome), base = id, k = 2; while(usados.has(id)) id = `${base}-${k++}`; usados.add(id);
-    out.push({id, nome, hex: d.querySelector(".c-hex").value, foto: foto ? normalizarFoto(foto) : "", esgotado: d.querySelector(".c-esg").checked});
+    const est = d.querySelector(".c-est").value;
+    if(est === "") return {erro: `Informe o estoque da cor ${nome} (pode ser 0).`};
+    out.push({id, nome, hex: d.querySelector(".c-hex").value, foto: foto ? normalizarFoto(foto) : "", estoque: Math.max(0, Math.floor(+est || 0))});
   }
   return out;
 }
-$("#btnAddCor").onclick = () => { linhaCor(); document.querySelector("#pCores .linha-cor:last-child .c-nome")?.focus(); };
+$("#btnAddCor").onclick = () => { linhaCor(); somaEstoqueCores(); document.querySelector("#pCores .linha-cor:last-child .c-nome")?.focus(); };
 document.body.insertAdjacentHTML("beforeend", `<datalist id="sugCores">${Object.keys(CORES_SUGERIDAS).map(n => `<option value="${n[0].toUpperCase()+n.slice(1)}">`).join("")}</datalist>`);
 
 function fecharModal(){ $("#modal").classList.add("oculto"); }
@@ -693,8 +703,8 @@ $("#formProduto").onsubmit = async e => {
       foto: editando?.foto || "", atualizado: Date.now()
     };
     const cores = lerCores();
-    if(cores === null) throw new Error("Toda cor precisa de um nome.");
-    if(cores.length) p.cores = cores; else delete p.cores;
+    if(cores.erro) throw new Error(cores.erro);
+    if(cores.length){ p.cores = cores; p.estoque = cores.reduce((s,c) => s + c.estoque, 0); } else delete p.cores;
     const fotoAntiga = editando?.foto || "";
     if(modoFB){ p.foto = normalizarFoto($("#pFotoUrl").value); }
     else if(novaFoto){
@@ -935,9 +945,13 @@ $("#vPedidos").onchange = async e => {
       for(const it of (ped.itens||[])){
         const prod = atual.find(x => x.id == it.id); if(!prod) continue;
         prod.vendidos = Math.max(0, (+prod.vendidos||0) + sinal*(+it.q||0));
-        if(ped.origem === "site") prod.estoque = Math.max(0, (+prod.estoque||0) - sinal*(+it.q||0));
+        if(ped.origem === "site"){
+          prod.estoque = Math.max(0, (+prod.estoque||0) - sinal*(+it.q||0));
+          const c = (prod.cores||[]).find(c => (it.corId && c.id === it.corId) || (!it.corId && it.cor && c.nome === it.cor));
+          if(c && c.estoque !== undefined && c.estoque !== "") c.estoque = Math.max(0, (+c.estoque||0) - sinal*(+it.q||0));
+        }
         await BD.salvarProduto(prod);
-        const loc = produtos.find(x => x.id == prod.id); if(loc){ loc.vendidos = prod.vendidos; loc.estoque = prod.estoque; }
+        const loc = produtos.find(x => x.id == prod.id); if(loc){ loc.vendidos = prod.vendidos; loc.estoque = prod.estoque; if(prod.cores) loc.cores = prod.cores; }
       }
       renderTabela();
     }

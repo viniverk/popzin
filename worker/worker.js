@@ -171,11 +171,17 @@ function regiaoPorUF(fretes, uf) {
   const nne = UF_NORTE_NORDESTE.includes(String(uf).toUpperCase());
   return chaves.find(k => nne ? /norte|nordeste/i.test(k) : /sul|sudeste|centro/i.test(k)) || chaves[0];
 }
+// estoque de uma cor: número cadastrado; cores antigas sem número seguem só o estoque do produto
+const estoqueCor = c => c.esgotado ? 0 : (c.estoque === undefined || c.estoque === null || c.estoque === "" ? Infinity : Math.max(0, +c.estoque || 0));
 function calcular(itensPedidos, produtos, cfg, uf) {
   if (!Array.isArray(itensPedidos) || !itensPedidos.length) throw erroPublico("Carrinho vazio.");
   const precoChav = +(cfg.precoChaveiro ?? 1) || 0;
-  const porProduto = {};
-  for (const it of itensPedidos) porProduto[+it.id] = (porProduto[+it.id] || 0) + Math.max(0, Math.floor(+it.q || 0));
+  const porProduto = {}, porCor = {};
+  for (const it of itensPedidos) {
+    const q = Math.max(0, Math.floor(+it.q || 0));
+    porProduto[+it.id] = (porProduto[+it.id] || 0) + q;
+    if (it.cor) porCor[`${+it.id}@${it.cor}`] = (porCor[`${+it.id}@${it.cor}`] || 0) + q;
+  }
   const itens = [];
   for (const it of itensPedidos) {
     const q = Math.floor(+it.q || 0);
@@ -189,14 +195,17 @@ function calcular(itensPedidos, produtos, cfg, uf) {
     const un = r2((combo ? +p.promoPreco : +p.preco) + (chav ? precoChav : 0));
     // variação de cor (opcional): precisa existir no produto e não estar esgotada
     const cores = Array.isArray(p.cores) ? p.cores : [];
-    let cor = "";
+    let cor = "", corId = "";
     if (cores.length) {
       const c = cores.find(x => x.id === String(it.cor || ""));
       if (!c) throw erroPublico(`Escolha a cor de ${p.nome}. Atualize a página.`);
-      if (c.esgotado) throw erroPublico(`${p.nome} na cor ${c.nome} esgotou. Escolha outra cor.`);
+      const disp = estoqueCor(c);
+      if (disp <= 0) throw erroPublico(`${p.nome} na cor ${c.nome} esgotou. Escolha outra cor.`);
+      if (porCor[`${+p.id}@${c.id}`] > disp) throw erroPublico(`Estoque insuficiente de ${p.nome} na cor ${c.nome} (disponível: ${disp}).`);
       cor = String(c.nome).slice(0, 40);
+      corId = c.id;
     }
-    itens.push({ id: +p.id, nome: p.nome + (cor ? ` — ${cor}` : ""), q, chaveiro: chav, combo, un, ...(cor ? { cor } : {}) });
+    itens.push({ id: +p.id, nome: p.nome + (cor ? ` — ${cor}` : ""), q, chaveiro: chav, combo, un, ...(cor ? { cor, corId } : {}) });
   }
   const sub = r2(itens.reduce((s, i) => s + i.un * i.q, 0));
   const regiao = regiaoPorUF(cfg.fretes, uf);
@@ -423,13 +432,18 @@ async function aplicarPagamento(env, ped, pg) {
   try { await avisarDono(env, dados); } catch (e) { console.error("aviso dono", dados.id, e.message); }
   // baixa de estoque e soma de vendidos
   const produtos = await listarProdutos(env);
-  const soma = {};
-  for (const it of ped.dados.itens || []) soma[it.id] = (soma[it.id] || 0) + it.q;
+  const soma = {}, somaCor = {};
+  for (const it of ped.dados.itens || []) {
+    soma[it.id] = (soma[it.id] || 0) + it.q;
+    if (it.corId) { somaCor[it.id] = somaCor[it.id] || {}; somaCor[it.id][it.corId] = (somaCor[it.id][it.corId] || 0) + it.q; }
+  }
   for (const [pid, q] of Object.entries(soma)) {
     const p = produtos.find(x => +x.id === +pid); if (!p) continue;
     const { _nome, ...limpo } = p;
     limpo.estoque = Math.max(0, (+p.estoque || 0) - q);
     limpo.vendidos = (+p.vendidos || 0) + q;
+    if (Array.isArray(p.cores) && somaCor[pid]) limpo.cores = p.cores.map(c => somaCor[pid][c.id] && Number.isFinite(estoqueCor(c)) && !c.esgotado
+      ? { ...c, estoque: Math.max(0, (+c.estoque || 0) - somaCor[pid][c.id]) } : c);
     await fs(env, `/produtos/${+pid}`, { method: "PATCH", body: JSON.stringify({ fields: { json: { stringValue: JSON.stringify(limpo) } } }) });
   }
 }
