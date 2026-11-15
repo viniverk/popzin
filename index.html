@@ -202,6 +202,10 @@
   .ck-aguarde i{width:10px;height:10px;border-radius:50%;background:var(--cor2);animation:pulso 1s ease-in-out infinite}
   @keyframes pulso{50%{opacity:.25;transform:scale(.7)}}
   .ck-ok{font-size:3.5rem;line-height:1}
+  .ck-parc{background:#faf7ff;border:1px solid var(--borda);border-radius:14px;padding:10px 14px}
+  .ck-parc summary{cursor:pointer;font-weight:700;color:var(--cor)}
+  .ck-parc .linha{display:flex;justify-content:space-between;font-size:.9rem;padding:5px 0;border-bottom:1px dashed var(--borda)}
+  .ck-parc small{display:block;color:var(--suave);font-size:.75rem;margin-top:8px}
   .ck-opcao{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;text-align:left;background:#fff;border:2px solid var(--borda);border-radius:16px;padding:14px;width:100%;font-family:inherit;color:var(--texto)}
   .ck-opcao:hover{border-color:var(--cor);background:#faf7ff}
   .ck-op-ico{font-size:1.8rem;text-align:center}
@@ -793,11 +797,13 @@ async function telaCartao(){
   $("#ckTitulo").textContent = "Pagar com cartão";
   $("#ckCorpo").innerHTML = `
     <div class="ck-resumo"><div class="linha total"><b>Total no cartão</b><b>${brl(t.cartao)}</b></div></div>
+    <details class="ck-parc" id="ckParc" ${maxParcelas() > 1 ? "" : "hidden"}><summary>Ver parcelas no crédito</summary><div id="ckParcLista"><div class="ck-aguarde"><i></i> Consultando…</div></div></details>
     <div id="ckErroCartao"></div>
     <div id="ckBrick"><div class="ck-aguarde"><i></i> Carregando o formulário seguro…</div></div>
     <div style="font-size:.78rem;color:var(--suave);text-align:center">🔒 Os dados do cartão são digitados no ambiente do Mercado Pago e não passam pela PopZin.</div>
     <button class="btn sec" type="button" id="cartaoVoltar">← Escolher outra forma de pagamento</button>`;
   $("#cartaoVoltar").onclick = async () => { await desmontarCartao(); telaEscolha(); };
+  if(maxParcelas() > 1) simularParcelas(t.cartao);
   try{
     carregarScript("https://www.mercadopago.com/v2/security.js", {view:"checkout"}).catch(() => {});
     await carregarScript("https://sdk.mercadopago.com/js/v2");
@@ -831,6 +837,18 @@ async function telaCartao(){
   }catch(err){
     $("#ckBrick").innerHTML = `<div class="ck-erro">${escH(err.message)} Tente o Pix ou recarregue a página.</div>`;
   }
+}
+/* simulação de parcelas (valores oficiais do Mercado Pago; usa Mastercard como referência) */
+async function simularParcelas(valor){
+  const el = $("#ckParcLista"); if(!el) return;
+  try{
+    const r = await fetch(`https://api.mercadopago.com/v1/payment_methods/installments?public_key=${encodeURIComponent(MP_PK())}&amount=${valor.toFixed(2)}&payment_method_id=master&locale=pt-BR`);
+    const j = await r.json(), custos = (j[0]?.payer_costs || []).filter(c => c.installments <= maxParcelas());
+    if(!custos.length) throw 0;
+    el.innerHTML = custos.map(c => `<div class="linha"><span>${c.installments}x de <b>${brl(c.installment_amount)}</b></span><span>${c.installment_rate ? `total ${brl(c.total_amount)}` : "<b style='color:var(--verde,#14915f)'>sem juros</b>"}</span></div>`).join("")
+      + `<small>Débito e crédito à vista: ${brl(valor)}. Valores podem variar um pouco conforme o banco/bandeira; você escolhe as parcelas depois de digitar o cartão.</small>`;
+    $("#ckParc").open = true;
+  }catch(e){ el.innerHTML = `<small>Você escolhe as parcelas depois de digitar o número do cartão.</small>`; }
 }
 function telaAnalise(p){
   carrinho = {}; salvar("popzin_carrinho", carrinho); atualizaCarrinho(); render();
