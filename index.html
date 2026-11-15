@@ -296,7 +296,8 @@
     <a href="#" id="lnkInsta" target="_blank" rel="noopener">📸 Instagram</a>
     <a href="#sobre">Sobre nós</a>
     <a href="admin.html">🔒 Área do lojista</a>
-    <a href="politica.html">Política de privacidade</a>
+    <a href="termos.html">Termos e trocas</a>
+    <a href="politica.html">Privacidade e cookies</a>
   </div>
   <div class="seg" aria-label="Formas de pagamento e segurança">
     <div class="seg-tit">Compra segura</div>
@@ -738,7 +739,7 @@ function telaDados(erro){
       <label class="m2 cid m4">Cidade<input name="cidade" required value="${escH(d.cidade)}"></label>
       <label class="m2 uf" style="grid-column:span 1">UF<select name="uf" required><option value=""></option>${UFS.map(u=>`<option ${u===d.uf?"selected":""}>${u}</option>`).join("")}</select></label>
       <div id="ckResumo" class="ck-resumo" style="grid-column:span 6"></div>
-      <label class="ck-aceite" style="grid-column:span 6;color:var(--suave);font-weight:400"><span style="display:flex;gap:8px"><input type="checkbox" name="aceite" required ${d.nome?"checked":""}> <span>Li e aceito a <a href="politica.html" target="_blank" rel="noopener">política de privacidade</a>. Meus dados são usados só para este pedido e a entrega.</span></span></label>
+      <label class="ck-aceite" style="grid-column:span 6;color:var(--suave);font-weight:400"><span style="display:flex;gap:8px"><input type="checkbox" name="aceite" required ${d.nome?"checked":""}> <span>Li e aceito os <a href="termos.html" target="_blank" rel="noopener">termos e a política de trocas</a> e a <a href="politica.html" target="_blank" rel="noopener">política de privacidade</a>. Meus dados são usados só para este pedido e a entrega.</span></span></label>
       <button class="btn" type="submit" style="grid-column:span 6">Continuar para o pagamento →</button>
     </form>`;
   const f = $("#ckForm");
