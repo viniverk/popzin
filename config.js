@@ -13,7 +13,7 @@ window.POPZIN_FIREBASE = {
 window.POPZIN_CHECKOUT = {
   api: "https://popzin-api.discipulos-pagamento.workers.dev",
   /* Public Key do Mercado Pago (pública, pode ficar aqui). Em branco = sem a opção de cartão. */
-  mpPublicKey: "APP_USR-e11c9034-bd65-49f4-811f-f209f7ddf424",
+  mpPublicKey: "APP_USR-e92531b6-933b-4117-a32c-516776fafc84",
   /* Site Key do Cloudflare Turnstile ("não sou robô"). Em branco = desligado. */
   turnstileSiteKey: "0x4AAAAAAGBeODXtX2zfrX7Z"
 };
