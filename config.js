@@ -15,5 +15,5 @@ window.POPZIN_CHECKOUT = {
   /* Public Key do Mercado Pago (pública, pode ficar aqui). Em branco = sem a opção de cartão. */
   mpPublicKey: "APP_USR-e11c9034-bd65-49f4-811f-f209f7ddf424",
   /* Site Key do Cloudflare Turnstile ("não sou robô"). Em branco = desligado. */
-  turnstileSiteKey: ""
+  turnstileSiteKey: "0x4AAAAAAGBeODXtX2zfrX7Z"
 };
