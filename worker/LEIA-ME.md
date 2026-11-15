@@ -22,3 +22,13 @@ Endereço: https://popzin-api.discipulos-pagamento.workers.dev
 5. Copie o endereço do worker (ex.: `https://popzin-api.SEUNOME.workers.dev`) e coloque em `config.js` → `POPZIN_CHECKOUT.api`.
 
 Nunca coloque o Access Token nem a conta de serviço no GitHub: só nas variáveis secretas do Cloudflare.
+
+## Proteção contra robôs (teste de cartão roubado)
+
+- **Limite por IP** (automático, configurado no `wrangler.toml`): 5 tentativas de cartão por minuto e 10 Pix por minuto.
+  Na 3ª recusa de cartão em 1 minuto, o cartão fica pausado por 30 minutos para aquele IP (o Pix continua liberado).
+- **"Não sou robô" (Cloudflare Turnstile)**, opcional:
+  1. Cloudflare → Turnstile → Add widget → nome "PopZin", domínios `popzin.com.br` e `www.popzin.com.br`, modo **Managed**.
+  2. Copie a **Site Key** para `turnstileSiteKey` no `config.js` (é pública).
+  3. Copie a **Secret Key** para o Worker `popzin-api` → Settings → Variables and Secrets → tipo **Secret**, nome `TURNSTILE_SECRET`.
+  Sem esses dois, o site e o servidor funcionam normalmente, só sem o "não sou robô".

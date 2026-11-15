@@ -27,8 +27,10 @@ export default {
     const cors = corsHeaders(req, env);
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     try {
-      if (req.method === "POST" && url.pathname === "/pix") return json(await criarPix(req, env, url), 200, cors);
-      if (req.method === "POST" && url.pathname === "/cartao") return json(await pagarCartao(req, env, url), 200, cors);
+      if (req.method === "POST" && url.pathname === "/pix") { await limitar(env.LIMITE_PIX, req, "Muitas tentativas. Aguarde um minuto e tente de novo.");
+        return json(await criarPix(req, env, url), 200, cors); }
+      if (req.method === "POST" && url.pathname === "/cartao") { await limitar(env.LIMITE_CARTAO, req, "Muitas tentativas com cartão. Aguarde um minuto ou pague com Pix.");
+        return json(await pagarCartao(req, env, url), 200, cors); }
       const m = url.pathname.match(/^\/pedido\/([a-z0-9]{6,40})$/);
       if (req.method === "GET" && m) return json(await statusPedido(m[1], url.searchParams.get("t") || "", env), 200, cors);
       if (req.method === "POST" && url.pathname === "/notificar") return json(await notificar(req, env), 200, { ...cors, "Access-Control-Allow-Headers": "Content-Type, Authorization" });
@@ -55,6 +57,42 @@ function corsHeaders(req, env) {
     ? { "Access-Control-Allow-Origin": origem, "Access-Control-Allow-Methods": "GET,POST,OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization", "Vary": "Origin" }
     : {};
 }
+/* ---------------------------------------------------- proteção contra robôs */
+const ipDe = req => req.headers.get("CF-Connecting-IP") || req.headers.get("X-Forwarded-For")?.split(",")[0].trim() || "sem-ip";
+// limite de tentativas por IP (Rate Limiting do Cloudflare, configurado no wrangler.toml)
+async function limitar(limitador, req, msg) {
+  if (!limitador) return;
+  const { success } = await limitador.limit({ key: ipDe(req) }).catch(() => ({ success: true }));
+  if (!success) throw erroPublico(msg, 429);
+}
+// "não sou robô" (Cloudflare Turnstile) — só exige depois que TURNSTILE_SECRET for cadastrado
+async function conferirHumano(env, req, tokenTs) {
+  if (!env.TURNSTILE_SECRET) return;
+  if (!tokenTs) throw erroPublico("Confirme a verificação de segurança e tente de novo.", 403);
+  const form = new FormData();
+  form.append("secret", env.TURNSTILE_SECRET); form.append("response", String(tokenTs).slice(0, 2048)); form.append("remoteip", ipDe(req));
+  const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form }).then(x => x.json()).catch(() => null);
+  if (!r?.success) throw erroPublico("A verificação de segurança expirou. Tente de novo.", 403);
+}
+
+// 3 cartões recusados em 1 minuto no mesmo IP → cartão bloqueado por 30 min para esse IP (o Pix continua)
+const MIN_BLOQUEIO = 30;
+const idIp = async req => "ip" + hexDe(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("popzin:" + ipDe(req)))).slice(0, 32);
+const hexDe = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+async function conferirBloqueio(env, req) {
+  const doc = await fs(env, `/bloqueios/${await idIp(req)}`).catch(() => null);
+  const ate = doc?.fields?.ate?.stringValue;
+  if (ate && Date.parse(ate) > Date.now()) throw erroPublico("Por segurança, o pagamento com cartão foi pausado por alguns minutos. Você pode pagar com Pix agora.", 429);
+}
+async function registrarRecusa(env, req) {
+  if (!env.LIMITE_RECUSAS) return;
+  const { success } = await env.LIMITE_RECUSAS.limit({ key: ipDe(req) }).catch(() => ({ success: true }));
+  if (success) return;
+  const ate = new Date(Date.now() + MIN_BLOQUEIO * 60000).toISOString();
+  await fs(env, `/bloqueios/${await idIp(req)}`, { method: "PATCH", body: JSON.stringify({ fields: { ate: { stringValue: ate } } }) }).catch(e => console.error("bloqueio", e.message));
+  console.warn("cartão bloqueado para um IP até", ate);
+}
+
 function erroPublico(msg, status = 400) { const e = new Error(msg); e.publico = msg; e.status = status; return e; }
 const r2 = v => Math.round(v * 100) / 100;
 const so = (s, n) => String(s ?? "").trim().slice(0, n);
@@ -249,6 +287,8 @@ const MOTIVOS_RECUSA = {
 async function pagarCartao(req, env, url) {
   const b = await req.json().catch(() => null);
   if (!b || !b.cartao?.token) throw erroPublico("Dados do cartão incompletos.");
+  await conferirHumano(env, req, b.turnstile);
+  await conferirBloqueio(env, req);
   const cliente = lerCliente(b);
   const [produtos, cfg] = await Promise.all([listarProdutos(env), lerConfig(env)]);
   const calc = calcular(b.itens, produtos, cfg, cliente.uf);
@@ -273,8 +313,10 @@ async function pagarCartao(req, env, url) {
     }),
   }).catch(e => { if (e.mpStatus && e.mpStatus < 500) throw erroPublico("Não foi possível processar o cartão. Confira os dados ou pague com Pix."); throw e; });
 
-  if (pg.status === "rejected" || pg.status === "cancelled")
+  if (pg.status === "rejected" || pg.status === "cancelled") {
+    await registrarRecusa(env, req);
     throw erroPublico(MOTIVOS_RECUSA[pg.status_detail] || "Pagamento recusado. Tente outro cartão ou pague com Pix.", 402);
+  }
 
   const cartaoInfo = { bandeira: pg.payment_method_id, tipo: pg.payment_type_id, parcelas: pg.installments || parcelas, final: pg.card?.last_four_digits || "" };
   const dados = { id, origem: "site", criado: agora.toISOString(), pagamento: "cartao", mpId: String(pg.id), cartao: cartaoInfo,

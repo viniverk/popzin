@@ -309,7 +309,7 @@
   </div>
 </div>
 
-<script src="config.js?v=6"></script>
+<script src="config.js?v=7"></script>
 <script>
 /* =========================================================
    CONFIGURAÇÃO — edite aqui
@@ -791,7 +791,23 @@ function carregarScript(src, attrs = {}){
     s.onload = ok; s.onerror = () => erro(new Error("Não foi possível carregar o pagamento com cartão.")); document.head.appendChild(s);
   });
 }
-async function desmontarCartao(){ try{ await brickCartao?.unmount(); }catch(e){} brickCartao = null; }
+/* "não sou robô" do Cloudflare (Turnstile): normalmente invisível; só pede um clique se desconfiar */
+let tsWidget = null;
+const TS_KEY = () => (CK.turnstileSiteKey || "").trim();
+async function iniciarTurnstile(){
+  if(!TS_KEY()) return;
+  try{
+    await carregarScript("https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit");
+    for(let i = 0; i < 50 && !window.turnstile; i++) await new Promise(r => setTimeout(r, 100));
+    if(!$("#ckTs") || !window.turnstile) return;
+    tsWidget = window.turnstile.render("#ckTs", { sitekey: TS_KEY(), appearance: "interaction-only", language: "pt-br", "refresh-expired": "auto" });
+  }catch(e){ console.error(e); }
+}
+// null = Turnstile desligado; "" = ainda verificando
+function tokenTurnstile(){ if(!TS_KEY()) return null; try{ return (tsWidget !== null && window.turnstile?.getResponse(tsWidget)) || ""; }catch(e){ return ""; } }
+function resetTurnstile(){ try{ if(tsWidget !== null) window.turnstile.reset(tsWidget); }catch(e){} }
+async function desmontarBrick(){ try{ await brickCartao?.unmount(); }catch(e){} brickCartao = null; }
+async function desmontarCartao(){ await desmontarBrick(); try{ if(tsWidget !== null) window.turnstile.remove(tsWidget); }catch(e){} tsWidget = null; }
 async function telaCartao(){
   const t = totaisCheckout(ckCliente.uf);
   $("#ckTitulo").textContent = "Pagar com cartão";
@@ -799,6 +815,7 @@ async function telaCartao(){
     <div class="ck-resumo"><div class="linha total"><b>Total no cartão</b><b>${brl(t.cartao)}</b></div></div>
     <details class="ck-parc" id="ckParc" ${maxParcelas() > 1 ? "" : "hidden"}><summary>Ver parcelas no crédito</summary><div id="ckParcLista"><div class="ck-aguarde"><i></i> Consultando…</div></div></details>
     <div id="ckErroCartao"></div>
+    <div id="ckTs" style="display:flex;justify-content:center"></div>
     <div id="ckBrick"><div class="ck-aguarde"><i></i> Carregando o formulário seguro…</div></div>
     <div style="font-size:.78rem;color:var(--suave);text-align:center">🔒 Os dados do cartão são digitados no ambiente do Mercado Pago e não passam pela PopZin.</div>
     <button class="btn sec" type="button" id="cartaoVoltar">← Escolher outra forma de pagamento</button>`;
@@ -806,9 +823,10 @@ async function telaCartao(){
   if(maxParcelas() > 1) simularParcelas(t.cartao);
   try{
     carregarScript("https://www.mercadopago.com/v2/security.js", {view:"checkout"}).catch(() => {});
+    iniciarTurnstile();
     await carregarScript("https://sdk.mercadopago.com/js/v2");
     mpSdk = mpSdk || new window.MercadoPago(MP_PK(), {locale:"pt-BR"});
-    await desmontarCartao();
+    await desmontarBrick();
     $("#ckBrick").innerHTML = "";
     brickCartao = await mpSdk.bricks().create("cardPayment", "ckBrick", {
       initialization: { amount: +t.cartao.toFixed(2), payer: { email: ckCliente.email, identification: { type: "CPF", number: (ckCliente.cpf||"").replace(/\D/g,"") } } },
@@ -819,9 +837,12 @@ async function telaCartao(){
         onError: err => { console.error(err); },
         onSubmit: formData => new Promise(async (resolve, reject) => {
           $("#ckErroCartao").innerHTML = "";
+          const tsTok = tokenTurnstile();
+          if(tsTok === ""){ $("#ckErroCartao").innerHTML = `<div class="ck-erro">Aguarde a verificação de segurança (logo acima do formulário) e clique em Pagar de novo.</div>`; return reject(); }
           try{
             const r = await fetch(`${API}/cartao`, {method:"POST", headers:{"Content-Type":"application/json"},
-              body: JSON.stringify({ cliente: ckCliente, obs: ckObs, itens: itensPedido(), cartao: formData, deviceId: window.MP_DEVICE_SESSION_ID || "" })});
+              body: JSON.stringify({ cliente: ckCliente, obs: ckObs, itens: itensPedido(), cartao: formData, deviceId: window.MP_DEVICE_SESSION_ID || "", turnstile: tsTok || undefined })});
+            resetTurnstile();
             const j = await r.json().catch(() => ({}));
             if(!r.ok) throw new Error(j.erro || "Pagamento não aprovado.");
             salvar("popzin_ultimo_pedido", {id:j.id, t:j.token});

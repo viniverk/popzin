@@ -1,6 +1,6 @@
 # Configuração do servidor de pagamentos (Cloudflare Worker "popzin-api").
 # Publicado automaticamente pelo Cloudflare Workers Builds a cada push neste repositório.
-# Os segredos (MP_ACCESS_TOKEN, FIREBASE_SA e RESEND_API_KEY) ficam só no painel do Cloudflare, nunca aqui.
+# Os segredos (MP_ACCESS_TOKEN, FIREBASE_SA, RESEND_API_KEY e TURNSTILE_SECRET) ficam só no painel do Cloudflare, nunca aqui.
 name = "popzin-api"
 main = "worker.js"
 compatibility_date = "2025-01-01"
@@ -11,6 +11,22 @@ FIREBASE_PROJECT = "popzin"
 ORIGENS = "https://popzin.com.br,https://www.popzin.com.br,https://viniverk.github.io"
 SITE_URL = "https://popzin.com.br"
 EMAIL_DE = "PopZin <pedidos@popzin.com.br>"
+
+# Limites de tentativas por IP (proteção contra robôs testando cartões roubados)
+[[ratelimits]]
+name = "LIMITE_CARTAO"     # tentativas de pagamento com cartão
+namespace_id = "2001"
+simple = { limit = 5, period = 60 }
+
+[[ratelimits]]
+name = "LIMITE_RECUSAS"    # cartões recusados: a 3ª recusa em 1 min → cartão pausado 30 min para o IP
+namespace_id = "2002"
+simple = { limit = 2, period = 60 }
+
+[[ratelimits]]
+name = "LIMITE_PIX"        # geração de Pix
+namespace_id = "2003"
+simple = { limit = 10, period = 60 }
 
 [triggers]
 crons = ["*/5 * * * *"]
