@@ -79,6 +79,12 @@
   .st{border-radius:8px;padding:4px 6px;font-size:.82rem;width:auto}
   .st-novo,.st-aguardando{background:#fff4d6}.st-pago{background:#e2f6ee}.st-preparo{background:#efe6ff}.st-enviado{background:#e3f0ff}.st-entregue{background:#e6f6f3}.st-cancelado,.st-expirado{background:#f4f1f1;color:#999}
   .vazio-v{color:var(--suave);font-size:.9rem;padding:10px 0}
+  .novo-tipo{grid-column:1/-1;background:var(--fundo);border:1px dashed var(--cor);border-radius:14px;padding:12px;display:grid;gap:10px}
+  .novo-tipo.oculto{display:none}
+  .nt-titulo{font-weight:800;font-size:.9rem}
+  .nt-campos{display:grid;grid-template-columns:80px 1fr;gap:10px}
+  .nt-campos #novoTipoEmoji{text-align:center;font-size:1.3rem}
+  .nt-acoes{display:flex;gap:8px;justify-content:flex-end}
   .fretes-linha{display:grid;grid-template-columns:1fr 120px 40px;gap:8px}
 
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(90px);background:var(--texto);color:#fff;padding:11px 20px;border-radius:999px;font-weight:700;transition:.25s;z-index:60;max-width:90vw;text-align:center}
@@ -234,12 +240,18 @@
       <label style="grid-column:1/-1">Nome<input id="pNome" required></label>
       <label>Tipo
         <select id="pTipo"></select>
-        <span id="novoTipoBox" class="oculto" style="display:flex;gap:6px;margin-top:6px">
-          <input id="novoTipoEmoji" maxlength="4" placeholder="🐉" style="width:58px;text-align:center">
-          <input id="novoTipoNome" placeholder="Nome do tipo (ex.: Chaveiros)">
-          <button type="button" class="btn" id="btnCriarTipo" style="padding:8px 12px">Criar</button>
-        </span>
       </label>
+      <div id="novoTipoBox" class="oculto novo-tipo">
+        <div class="nt-titulo">➕ Novo tipo de produto</div>
+        <div class="nt-campos">
+          <label>Emoji<input id="novoTipoEmoji" maxlength="4" placeholder="🐉"></label>
+          <label>Nome do tipo<input id="novoTipoNome" placeholder="ex.: Super-heróis"></label>
+        </div>
+        <div class="nt-acoes">
+          <button type="button" class="btn sec" id="btnCancelarTipo">Cancelar</button>
+          <button type="button" class="btn" id="btnCriarTipo">Criar tipo</button>
+        </div>
+      </div>
       <label>Coleção
         <select id="pColecaoSel"></select>
         <input id="pColecao" class="oculto" placeholder="Nome da nova coleção (ex.: Natal)" style="margin-top:6px">
@@ -836,6 +848,7 @@ $("#pTipo").onchange = () => {
   $("#novoTipoBox").classList.toggle("oculto", !novo);
   if(novo){ $("#novoTipoNome").value = ""; $("#novoTipoEmoji").value = ""; $("#novoTipoNome").focus(); }
 };
+$("#btnCancelarTipo").onclick = () => montarSelTipo(tiposLoja()[0]?.id);
 $("#btnCriarTipo").onclick = async () => {
   const nome = $("#novoTipoNome").value.trim(), emoji = $("#novoTipoEmoji").value.trim() || "✨";
   if(!nome) return toast("Dê um nome ao tipo", true);
