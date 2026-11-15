@@ -201,6 +201,11 @@
           <div id="fretes" style="display:grid;gap:8px"></div>
           <button class="btn sec" id="btnAddFrete" style="margin-top:8px">+ região</button>
         </div>
+        <div>
+          <label style="margin-bottom:6px">Tipos de produto (viram abas na loja)</label>
+          <div id="tiposLista" style="display:grid;gap:8px"></div>
+          <div class="ajuda" style="margin-top:6px">Para criar um tipo novo, use “➕ Criar novo tipo…” ao cadastrar um produto. Aqui você renomeia, troca o emoji ou remove.</div>
+        </div>
         <button class="btn" id="btnSalvarLoja">Salvar configurações</button>
       </div>
     </section>
@@ -228,9 +233,17 @@
     <div class="grid2">
       <label style="grid-column:1/-1">Nome<input id="pNome" required></label>
       <label>Tipo
-        <select id="pTipo"><option value="animal">🐾 Animal</option><option value="mini">🧸 Mini</option><option value="dino">🦖 Dino</option></select>
+        <select id="pTipo"></select>
+        <span id="novoTipoBox" class="oculto" style="display:flex;gap:6px;margin-top:6px">
+          <input id="novoTipoEmoji" maxlength="4" placeholder="🐉" style="width:58px;text-align:center">
+          <input id="novoTipoNome" placeholder="Nome do tipo (ex.: Chaveiros)">
+          <button type="button" class="btn" id="btnCriarTipo" style="padding:8px 12px">Criar</button>
+        </span>
       </label>
-      <label>Coleção<input id="pColecao" list="listaColecoes" placeholder="Mar, Fazenda, Natal..."></label>
+      <label>Coleção
+        <select id="pColecaoSel"></select>
+        <input id="pColecao" class="oculto" placeholder="Nome da nova coleção (ex.: Natal)" style="margin-top:6px">
+      </label>
       <label>Preço (R$)<input id="pPreco" type="number" step="0.01" min="0" required></label>
       <label>Preço "de" (opcional)<input id="pDe" type="number" step="0.01" min="0"></label>
       <label>Estoque<input id="pEstoque" type="number" min="0" value="0"></label>
@@ -240,7 +253,7 @@
       <label>Emoji (sem foto)<input id="pEmoji" maxlength="8" placeholder="🐙"></label>
       <label>Cor de fundo<input id="pCor" type="color" value="#f1ebff" style="height:42px;padding:4px"></label>
     </div>
-    <datalist id="listaColecoes"></datalist>
+
     <div class="checks">
       <label><input type="checkbox" id="pNovo"> Novidade</label>
       <label><input type="checkbox" id="pDestaque"> Destaque</label>
@@ -538,7 +551,7 @@ function renderTabela(){
       <td class="col-estoque">${+p.estoque||0}</td>
       <td><div class="acoes"><button class="btn sec" data-editar="${p.id}">Editar</button></div></td>
     </tr>`).join("") : `<tr><td colspan="6" style="text-align:center;color:var(--suave);padding:30px">Nenhum produto ainda. Clique em “+ Novo produto”.</td></tr>`;
-  $("#listaColecoes").innerHTML = [...new Set(produtos.map(p=>p.colecao).filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join("");
+
 }
 $("#filtro").oninput = renderTabela;
 $("#tabela").onclick = e => { const b = e.target.closest("[data-editar]"); if(b) abrirModal(produtos.find(p=>p.id==b.dataset.editar)); };
@@ -548,7 +561,7 @@ function abrirModal(p){
   editando = p; novaFoto = null; removerFoto = false;
   $("#mTitulo").textContent = p ? "Editar produto" : "Novo produto";
   $("#btnExcluir").classList.toggle("oculto", !p);
-  $("#pNome").value = p?.nome || ""; $("#pTipo").value = p?.tipo || "animal"; $("#pColecao").value = p?.colecao || "";
+  $("#pNome").value = p?.nome || ""; montarSelTipo(p?.tipo || tiposLoja()[0]?.id); montarSelColecao(p?.colecao || "");
   $("#pPreco").value = p?.preco ?? ""; $("#pDe").value = p?.de || ""; $("#pEstoque").value = p?.estoque ?? 0;
   $("#pVendidos").value = p?.vendidos ?? 0; $("#pPromoQtd").value = p?.promoQtd || ""; $("#pPromoPreco").value = p?.promoPreco || ""; $("#pEmoji").value = p?.emoji || ""; $("#pCor").value = p?.cor || "#f1ebff";
   $("#pChav").checked = !p?.semChaveiro; $("#pNovo").checked = !!p?.novo; $("#pDestaque").checked = !!p?.destaque; $("#pFoto").value = ""; $("#pFotoUrl").value = p?.foto || "";
@@ -598,7 +611,7 @@ $("#formProduto").onsubmit = async e => {
   try{
     const id = editando ? editando.id : (Math.max(0, ...produtos.map(p=>+p.id||0)) + 1);
     const p = {
-      id, nome:$("#pNome").value.trim(), tipo:$("#pTipo").value, colecao:$("#pColecao").value.trim(),
+      id, nome:$("#pNome").value.trim(), tipo:$("#pTipo").value, colecao:colecaoEscolhida(),
       preco:+$("#pPreco").value||0, de:+$("#pDe").value||0, estoque:+$("#pEstoque").value||0, vendidos:+$("#pVendidos").value||0, promoQtd:Math.floor(+$("#pPromoQtd").value||0), promoPreco:+$("#pPromoPreco").value||0,
       emoji:$("#pEmoji").value.trim(), cor:$("#pCor").value, novo:$("#pNovo").checked, destaque:$("#pDestaque").checked, semChaveiro:!$("#pChav").checked,
       foto: editando?.foto || "", atualizado: Date.now()
@@ -808,6 +821,65 @@ $("#vPedidos").onchange = async e => {
   }catch(err){ toast(err.message, true); }
 };
 
+/* ---------- tipos (abas da loja) e coleções ---------- */
+const TIPOS_PADRAO = [{id:"animal", nome:"Animais", emoji:"🐾"}, {id:"mini", nome:"Minis", emoji:"🧸"}, {id:"dino", nome:"Dinos", emoji:"🦖"}];
+const tiposLoja = () => (Array.isArray(loja.tipos) && loja.tipos.length ? loja.tipos : TIPOS_PADRAO);
+const NOVO = "__novo__";
+function montarSelTipo(atual){
+  const ts = tiposLoja();
+  const extra = atual && !ts.some(t => t.id === atual) ? `<option value="${esc(atual)}">${esc(atual)}</option>` : "";
+  $("#pTipo").innerHTML = ts.map(t => `<option value="${esc(t.id)}">${esc(t.emoji||"")} ${esc(t.nome)}</option>`).join("") + extra + `<option value="${NOVO}">➕ Criar novo tipo…</option>`;
+  $("#pTipo").value = atual || ts[0]?.id; $("#novoTipoBox").classList.add("oculto");
+}
+$("#pTipo").onchange = () => {
+  const novo = $("#pTipo").value === NOVO;
+  $("#novoTipoBox").classList.toggle("oculto", !novo);
+  if(novo){ $("#novoTipoNome").value = ""; $("#novoTipoEmoji").value = ""; $("#novoTipoNome").focus(); }
+};
+$("#btnCriarTipo").onclick = async () => {
+  const nome = $("#novoTipoNome").value.trim(), emoji = $("#novoTipoEmoji").value.trim() || "✨";
+  if(!nome) return toast("Dê um nome ao tipo", true);
+  const id = slug(nome);
+  if(tiposLoja().some(t => t.id === id)){ montarSelTipo(id); return toast("Esse tipo já existe — selecionei ele."); }
+  const b = $("#btnCriarTipo"); b.disabled = true;
+  try{
+    loja = {...loja, tipos:[...tiposLoja(), {id, nome, emoji}]};
+    await BD.salvarLoja(loja);
+    montarSelTipo(id); renderTipos(); toast(`Tipo "${emoji} ${nome}" criado ✅ — vira uma aba na loja`);
+  }catch(err){ toast(err.message, true); }
+  b.disabled = false;
+};
+function montarSelColecao(atual){
+  const cols = [...new Set(produtos.map(p => p.colecao).filter(Boolean))].sort((x,y) => x.localeCompare(y,"pt-BR"));
+  if(atual && !cols.includes(atual)) cols.push(atual);
+  $("#pColecaoSel").innerHTML = `<option value="">— sem coleção —</option>` + cols.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("") + `<option value="${NOVO}">➕ Criar nova coleção…</option>`;
+  $("#pColecaoSel").value = atual || ""; $("#pColecao").value = ""; $("#pColecao").classList.add("oculto");
+}
+$("#pColecaoSel").onchange = () => {
+  const novo = $("#pColecaoSel").value === NOVO;
+  $("#pColecao").classList.toggle("oculto", !novo);
+  if(novo){ $("#pColecao").value = ""; $("#pColecao").focus(); }
+};
+const colecaoEscolhida = () => $("#pColecaoSel").value === NOVO ? $("#pColecao").value.trim() : $("#pColecaoSel").value;
+
+/* gerenciar tipos na aba Loja: renomear, trocar emoji, remover */
+function renderTipos(){
+  const box = $("#tiposLista"); if(!box) return;
+  const ts = tiposLoja();
+  box.innerHTML = ts.map((t,i) => `<div class="fretes-linha" style="grid-template-columns:58px 1fr 90px 40px">
+      <input data-temoji="${i}" value="${esc(t.emoji||"")}" maxlength="4" style="text-align:center">
+      <input data-tnome="${i}" value="${esc(t.nome)}">
+      <small style="align-self:center;color:var(--suave)">${produtos.filter(p => p.tipo === t.id).length} produto(s)</small>
+      <button class="btn sec" type="button" data-tdel="${i}" title="Remover">✕</button></div>`).join("");
+  box.querySelectorAll("[data-tdel]").forEach(b => b.onclick = () => {
+    const t = ts[+b.dataset.tdel], usados = produtos.filter(p => p.tipo === t.id).length;
+    if(usados) return toast(`"${t.nome}" tem ${usados} produto(s). Mude o tipo deles antes de remover.`, true);
+    if(ts.length <= 1) return toast("Deixe pelo menos um tipo.", true);
+    loja = {...loja, tipos: ts.filter((_,j) => j !== +b.dataset.tdel)}; renderTipos();
+  });
+}
+const tiposDoFormulario = () => tiposLoja().map((t,i) => ({...t, nome:($(`[data-tnome="${i}"]`)?.value||t.nome).trim()||t.nome, emoji:($(`[data-temoji="${i}"]`)?.value||"").trim()||t.emoji}));
+
 /* ---------- configurações da loja ---------- */
 function linhaFrete(nome="", valor=""){
   const d = document.createElement("div"); d.className = "fretes-linha";
@@ -820,6 +892,7 @@ function preencherLoja(){
   $("#cPix").value = Math.round((loja.descontoPix||0)*1000)/10; $("#cVip").value = loja.linkGrupoVip||""; $("#cInsta").value = loja.instagram||"";
   $("#cChav").value = loja.precoChaveiro ?? 1; $("#cPrazo").value = loja.prazoEncomenda || ""; $("#cFaixaTitulo").value = loja.faixaTitulo||""; $("#cFaixaSub").value = loja.faixaSub||""; $("#cFaixaOcultar").checked = !!loja.faixaOcultar;
   $("#fretes").innerHTML = ""; Object.entries(loja.fretes||{}).forEach(([n,v]) => linhaFrete(n,v));
+  renderTipos();
 }
 $("#btnAddFrete").onclick = () => linhaFrete();
 $("#btnSalvarLoja").onclick = async () => {
@@ -827,7 +900,7 @@ $("#btnSalvarLoja").onclick = async () => {
   const fretes = {};
   $("#fretes").querySelectorAll(".fretes-linha").forEach(l => { const [n,v] = l.querySelectorAll("input"); if(n.value.trim()) fretes[n.value.trim()] = +v.value||0; });
   if(!Object.keys(fretes).length){ b.disabled=false; return toast("Cadastre pelo menos uma região de frete.", true); }
-  loja = { loja:$("#cLoja").value.trim()||"PopZin", whatsapp:$("#cWhats").value.replace(/\D/g,""), freteGratisAcima:+$("#cFreteGratis").value||0,
+  loja = { ...loja, tipos: tiposDoFormulario(), loja:$("#cLoja").value.trim()||"PopZin", whatsapp:$("#cWhats").value.replace(/\D/g,""), freteGratisAcima:+$("#cFreteGratis").value||0,
            descontoPix:(+$("#cPix").value||0)/100, fretes, linkGrupoVip:$("#cVip").value.trim()||"#", instagram:$("#cInsta").value.trim()||"#",
            faixaTitulo:$("#cFaixaTitulo").value.trim(), faixaSub:$("#cFaixaSub").value.trim(), faixaOcultar:$("#cFaixaOcultar").checked, precoChaveiro:+$("#cChav").value||0, prazoEncomenda:$("#cPrazo").value.trim() };
   try{ await BD.salvarLoja(loja); toast(modoFB ? "Configurações salvas — já valem no site ✅" : "Configurações salvas ✅"); }

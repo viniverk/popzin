@@ -349,7 +349,12 @@ const ATALHOS = [
 ];
 
 /* ========================================================= */
-const TIPOS = {todos:"Todos", animal:"🐾 Animais", mini:"🧸 Minis", dino:"🦖 Dinos"};
+let TIPOS = {todos:"Todos", animal:"🐾 Animais", mini:"🧸 Minis", dino:"🦖 Dinos"};
+/* tipos criados no painel (loja.tipos) viram abas */
+function carregarTipos(){
+  if(Array.isArray(CONFIG.tipos) && CONFIG.tipos.length)
+    TIPOS = {todos:"Todos", ...Object.fromEntries(CONFIG.tipos.map(t => [t.id, `${t.emoji||""} ${t.nome}`.trim()]))};
+}
 const $ = s => document.querySelector(s);
 const brl = v => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 /* Imgur entrega versões menores da mesma foto: "l" = 640px, "t" = 160px (bem mais leves que a original) */
@@ -455,6 +460,7 @@ montarFiltros();
 /* abas e coleções */
 /* só mostra abas/coleções que têm produto, com a contagem */
 function montarFiltros(){
+  carregarTipos();
   const cont = t => PRODUTOS.filter(p => t==="todos" || p.tipo===t).length;
   const tipos = Object.entries(TIPOS).filter(([k]) => k==="todos" || cont(k) > 0);
   if(!tipos.some(([k]) => k===estado.tipo)) estado.tipo = "todos";
