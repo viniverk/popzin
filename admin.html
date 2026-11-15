@@ -92,7 +92,8 @@
   .toast.erro{background:var(--erro)}
   @media(max-width:640px){
     .foto-area{grid-template-columns:1fr}
-    .col-colecao,.col-estoque{display:none}
+    .col-colecao,.col-estoque,.col-tipo{display:none}
+    .tipo-mob{display:block!important}
   }
 </style>
 </head>
@@ -155,7 +156,7 @@
       <div class="ajuda" id="avisoTempo" style="margin-bottom:10px">Depois de salvar, o site leva cerca de 1 minuto para atualizar no GitHub Pages.</div>
       <div id="importar" class="cartao oculto" style="margin-bottom:14px;max-width:none"></div>
       <table>
-        <thead><tr><th></th><th>Produto</th><th class="col-colecao">Coleção</th><th>Preço</th><th class="col-estoque">Estoque</th><th></th></tr></thead>
+        <thead><tr><th></th><th>Produto</th><th class="col-tipo">Tipo</th><th class="col-colecao">Coleção</th><th>Preço</th><th class="col-estoque">Estoque</th><th></th></tr></thead>
         <tbody id="tabela"></tbody>
       </table>
     </section>
@@ -531,7 +532,7 @@ $("#btnSair").onclick = async () => {
 async function entrarNoPainel(){
   mostrar("#telaPainel");
   if(modoFB) iniciarVigia();
-  $("#tabela").innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--suave);padding:30px">Carregando...</td></tr>`;
+  $("#tabela").innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--suave);padding:30px">Carregando...</td></tr>`;
   try{
     produtos = await BD.lerProdutos();
     loja = (await BD.lerLoja()) || {...PADRAO_LOJA};
@@ -556,16 +557,17 @@ document.querySelectorAll(".aba").forEach(b => b.onclick = () => {
 /* ---------- produtos ---------- */
 function renderTabela(){
   const f = $("#filtro").value.toLowerCase();
-  const lista = produtos.filter(p => !f || (p.nome+" "+(p.colecao||"")).toLowerCase().includes(f));
+  const lista = produtos.filter(p => !f || (p.nome+" "+(p.colecao||"")+" "+(tiposLoja().find(t => t.id === p.tipo)?.nome||p.tipo||"")).toLowerCase().includes(f));
   $("#tabela").innerHTML = lista.length ? lista.map(p => `
     <tr>
       <td>${p.foto ? `<img class="thumb" src="${esc(p.foto)}?v=${p.atualizado||""}" alt="">` : `<div class="thumb" style="background:${esc(p.cor||'#f5eee9')}">${esc(p.emoji||"🐾")}</div>`}</td>
-      <td><b>${esc(p.nome)}</b><br>${p.novo?'<span class="pill">NOVO</span>':''}${p.destaque?'<span class="pill" style="background:var(--cor)">DESTAQUE</span>':''}${!+p.estoque?'<span class="pill esg">ESGOTADO</span>':''}</td>
+      <td><b>${esc(p.nome)}</b><small class="tipo-mob" style="display:none;color:var(--suave)">${(t => t ? `${esc(t.emoji||"")} ${esc(t.nome)}` : esc(p.tipo||""))(tiposLoja().find(t => t.id === p.tipo))}</small><br>${p.novo?'<span class="pill">NOVO</span>':''}${p.destaque?'<span class="pill" style="background:var(--cor)">DESTAQUE</span>':''}${!+p.estoque?'<span class="pill esg">ESGOTADO</span>':''}</td>
+      <td class="col-tipo">${(t => t ? `${esc(t.emoji||"")} ${esc(t.nome)}` : esc(p.tipo||"—"))(tiposLoja().find(t => t.id === p.tipo))}</td>
       <td class="col-colecao">${esc(p.colecao||"")}</td>
       <td>${brl(p.preco)}${+p.de?`<br><s style="color:var(--suave);font-size:.8rem">${brl(p.de)}</s>`:""}</td>
       <td class="col-estoque">${+p.estoque||0}</td>
       <td><div class="acoes"><button class="btn sec" data-editar="${p.id}">Editar</button></div></td>
-    </tr>`).join("") : `<tr><td colspan="6" style="text-align:center;color:var(--suave);padding:30px">Nenhum produto ainda. Clique em “+ Novo produto”.</td></tr>`;
+    </tr>`).join("") : `<tr><td colspan="7" style="text-align:center;color:var(--suave);padding:30px">Nenhum produto ainda. Clique em “+ Novo produto”.</td></tr>`;
 
 }
 $("#filtro").oninput = renderTabela;
