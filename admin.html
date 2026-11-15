@@ -151,6 +151,7 @@
     <section id="abaProdutos">
       <div class="barra">
         <input id="filtro" type="search" placeholder="🔍 Buscar produto...">
+        <button class="btn sec" id="btnTC" type="button">🏷️ Tipos e coleções</button>
         <button class="btn" id="btnNovo">+ Novo produto</button>
       </div>
       <div class="ajuda" id="avisoTempo" style="margin-bottom:10px">Depois de salvar, o site leva cerca de 1 minuto para atualizar no GitHub Pages.</div>
@@ -211,9 +212,8 @@
           <button class="btn sec" id="btnAddFrete" style="margin-top:8px">+ região</button>
         </div>
         <div>
-          <label style="margin-bottom:6px">Tipos de produto (viram abas na loja)</label>
-          <div id="tiposLista" style="display:grid;gap:8px"></div>
-          <div class="ajuda" style="margin-top:6px">Para criar um tipo novo, use “➕ Criar novo tipo…” ao cadastrar um produto. Aqui você renomeia, troca o emoji ou remove.</div>
+          <label style="margin-bottom:6px">Tipos de produto e coleções</label>
+          <button class="btn sec" type="button" onclick="abrirTC()">🏷️ Editar tipos e coleções</button>
         </div>
         <button class="btn" id="btnSalvarLoja">Salvar configurações</button>
       </div>
@@ -222,6 +222,26 @@
 </div>
 
 <!-- ===== MODAL PRODUTO ===== -->
+<div id="modalTC" class="modal-veu oculto">
+  <div class="modal">
+    <h3>🏷️ Tipos e coleções</h3>
+    <div>
+      <label style="margin-bottom:4px">Tipos (viram as abas da loja)</label>
+      <div class="ajuda" style="margin-bottom:8px">Renomeie, troque o emoji ou remova. Um tipo com produtos só pode ser removido escolhendo para onde eles vão.</div>
+      <div id="tcTipos" style="display:grid;gap:8px"></div>
+      <button class="btn sec" type="button" id="tcAddTipo" style="margin-top:8px">+ novo tipo</button>
+    </div>
+    <div>
+      <label style="margin-bottom:4px">Coleções</label>
+      <div class="ajuda" style="margin-bottom:8px">Renomear muda em todos os produtos da coleção. Dar o nome de outra coleção junta as duas. Remover deixa os produtos sem coleção.</div>
+      <div id="tcCols" style="display:grid;gap:8px"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+      <button class="btn sec" type="button" id="tcCancelar">Cancelar</button>
+      <button class="btn" type="button" id="tcSalvar">Salvar alterações</button>
+    </div>
+  </div>
+</div>
 <div id="modal" class="modal-veu oculto">
   <form class="modal" id="formProduto">
     <h3 id="mTitulo">Novo produto</h3>
@@ -930,22 +950,77 @@ $("#pColecaoSel").onchange = () => {
 const colecaoEscolhida = () => $("#pColecaoSel").value === NOVO ? $("#pColecao").value.trim() : $("#pColecaoSel").value;
 
 /* gerenciar tipos na aba Loja: renomear, trocar emoji, remover */
-function renderTipos(){
-  const box = $("#tiposLista"); if(!box) return;
-  const ts = tiposLoja();
-  box.innerHTML = ts.map((t,i) => `<div class="fretes-linha" style="grid-template-columns:58px 1fr 90px 40px">
-      <input data-temoji="${i}" value="${esc(t.emoji||"")}" maxlength="4" style="text-align:center">
-      <input data-tnome="${i}" value="${esc(t.nome)}">
-      <small style="align-self:center;color:var(--suave)">${produtos.filter(p => p.tipo === t.id).length} produto(s)</small>
-      <button class="btn sec" type="button" data-tdel="${i}" title="Remover">✕</button></div>`).join("");
-  box.querySelectorAll("[data-tdel]").forEach(b => b.onclick = () => {
-    const t = ts[+b.dataset.tdel], usados = produtos.filter(p => p.tipo === t.id).length;
-    if(usados) return toast(`"${t.nome}" tem ${usados} produto(s). Mude o tipo deles antes de remover.`, true);
-    if(ts.length <= 1) return toast("Deixe pelo menos um tipo.", true);
-    loja = {...loja, tipos: ts.filter((_,j) => j !== +b.dataset.tdel)}; renderTipos();
-  });
+function renderTipos(){}   // a edição de tipos agora fica no quadro "Tipos e coleções"
+const tiposDoFormulario = () => tiposLoja();
+
+/* quadro "Tipos e coleções": rascunho editado na tela e salvo de uma vez */
+let tcTipos = [], tcCols = [];
+const listaColecoes = () => [...new Set(produtos.map(p => p.colecao).filter(Boolean))].sort((x,y) => x.localeCompare(y,"pt-BR"));
+function abrirTC(){
+  tcTipos = tiposLoja().map(t => ({...t, orig:t.id, para:""}));
+  tcCols = listaColecoes().map(c => ({orig:c, nome:c, del:false}));
+  desenharTC(); $("#modalTC").classList.remove("oculto");
 }
-const tiposDoFormulario = () => tiposLoja().map((t,i) => ({...t, nome:($(`[data-tnome="${i}"]`)?.value||t.nome).trim()||t.nome, emoji:($(`[data-temoji="${i}"]`)?.value||"").trim()||t.emoji}));
+function desenharTC(){
+  const vivos = tcTipos.filter(t => !t.del);
+  $("#tcTipos").innerHTML = tcTipos.map((t,i) => {
+    const n = t.orig ? produtos.filter(p => p.tipo === t.orig).length : 0;
+    if(t.del) return `<div class="fretes-linha" style="grid-template-columns:1fr auto;opacity:.75"><small style="align-self:center">🗑️ <s>${esc(t.emoji)} ${esc(t.nome)}</s>${n ? ` — ${n} produto(s) vão para <select data-tpara="${i}" style="padding:4px;width:auto;display:inline-block">${vivos.filter(v => v.orig).map(v => `<option value="${esc(v.orig)}" ${t.para===v.orig?"selected":""}>${esc(v.emoji)} ${esc(v.nome)}</option>`).join("")}</select>` : ""}</small><button class="btn sec" type="button" data-tvolta="${i}">Desfazer</button></div>`;
+    return `<div class="fretes-linha" style="grid-template-columns:58px 1fr 92px 40px">
+      <input data-temoji="${i}" value="${esc(t.emoji||"")}" maxlength="4" style="text-align:center" aria-label="Emoji">
+      <input data-tnome="${i}" value="${esc(t.nome)}" placeholder="Nome do tipo" aria-label="Nome do tipo">
+      <small style="align-self:center;color:var(--suave)">${n} produto(s)</small>
+      <button class="btn sec" type="button" data-tdel="${i}" title="Remover">✕</button></div>`; }).join("");
+  $("#tcCols").innerHTML = tcCols.length ? tcCols.map((c,i) => {
+    const n = produtos.filter(p => p.colecao === c.orig).length;
+    return c.del
+      ? `<div class="fretes-linha" style="grid-template-columns:1fr auto;opacity:.75"><small style="align-self:center">🗑️ <s>${esc(c.orig)}</s> — ${n} produto(s) ficam sem coleção</small><button class="btn sec" type="button" data-cvolta="${i}">Desfazer</button></div>`
+      : `<div class="fretes-linha" style="grid-template-columns:1fr 92px 40px"><input data-cnome="${i}" value="${esc(c.nome)}" aria-label="Nome da coleção"><small style="align-self:center;color:var(--suave)">${n} produto(s)</small><button class="btn sec" type="button" data-cdel="${i}" title="Remover">✕</button></div>`; }).join("")
+    : `<div class="ajuda">Nenhuma coleção ainda. Crie ao cadastrar um produto (“➕ Criar nova coleção…”).</div>`;
+}
+function lerTC(){
+  document.querySelectorAll("[data-tnome]").forEach(el => tcTipos[+el.dataset.tnome].nome = el.value);
+  document.querySelectorAll("[data-temoji]").forEach(el => tcTipos[+el.dataset.temoji].emoji = el.value);
+  document.querySelectorAll("[data-tpara]").forEach(el => tcTipos[+el.dataset.tpara].para = el.value);
+  document.querySelectorAll("[data-cnome]").forEach(el => tcCols[+el.dataset.cnome].nome = el.value);
+}
+$("#modalTC").addEventListener("click", e => {
+  const b = e.target.closest("button"); if(!b) return;
+  if(b.dataset.tdel !== undefined){ lerTC(); const t = tcTipos[+b.dataset.tdel];
+    if(tcTipos.filter(x => !x.del).length <= 1) return toast("Deixe pelo menos um tipo.", true);
+    if(!t.orig) tcTipos.splice(+b.dataset.tdel, 1); else { t.del = true; t.para = (tcTipos.find(x => !x.del && x !== t)?.orig) || tcTipos.find(x => !x.del && x !== t)?.id || ""; }
+    desenharTC(); }
+  if(b.dataset.tvolta !== undefined){ lerTC(); tcTipos[+b.dataset.tvolta].del = false; desenharTC(); }
+  if(b.dataset.cdel !== undefined){ lerTC(); tcCols[+b.dataset.cdel].del = true; desenharTC(); }
+  if(b.dataset.cvolta !== undefined){ lerTC(); tcCols[+b.dataset.cvolta].del = false; desenharTC(); }
+});
+$("#tcAddTipo").onclick = () => { lerTC(); tcTipos.push({id:"", orig:"", nome:"", emoji:"✨"}); desenharTC(); document.querySelector(`[data-tnome="${tcTipos.length-1}"]`)?.focus(); };
+$("#tcCancelar").onclick = () => $("#modalTC").classList.add("oculto");
+$("#btnTC").onclick = abrirTC;
+$("#tcSalvar").onclick = async () => {
+  lerTC();
+  const vivos = tcTipos.filter(t => !t.del);
+  if(vivos.some(t => !t.nome.trim())) return toast("Todo tipo precisa de um nome.", true);
+  // tipos novos ganham id a partir do nome
+  const ids = new Set(vivos.filter(t => t.orig).map(t => t.orig));
+  vivos.filter(t => !t.orig).forEach(t => { let id = slug(t.nome) || "tipo", k = 2, base = id; while(ids.has(id)) id = `${base}-${k++}`; ids.add(id); t.id = id; t.para = ""; });
+  const novosTipos = vivos.map(t => ({id: t.orig || t.id, nome: t.nome.trim(), emoji: (t.emoji||"").trim() || "✨"}));
+  // produtos que mudam: tipo removido → destino; coleção renomeada/removida
+  const mapaTipo = Object.fromEntries(tcTipos.filter(t => t.del && t.orig).map(t => [t.orig, t.para || novosTipos[0].id]));
+  const mapaCol = Object.fromEntries(tcCols.map(c => [c.orig, c.del ? "" : c.nome.trim()]).filter(([o,n]) => o !== n));
+  const mudar = produtos.filter(p => mapaTipo[p.tipo] || (p.colecao && p.colecao in mapaCol))
+    .map(p => ({...p, ...(mapaTipo[p.tipo] ? {tipo: mapaTipo[p.tipo]} : {}), ...(p.colecao in mapaCol ? {colecao: mapaCol[p.colecao]} : {}), atualizado: Date.now()}));
+  const b = $("#tcSalvar"); b.disabled = true; b.textContent = "Salvando...";
+  try{
+    loja = {...loja, tipos: novosTipos};
+    await BD.salvarLoja(loja);
+    if(mudar.length) await BD.salvarVarios(mudar);
+    produtos = await BD.lerProdutos();
+    renderTabela(); $("#modalTC").classList.add("oculto");
+    toast(`Salvo ✅${mudar.length ? ` (${mudar.length} produto(s) atualizado(s))` : ""}`);
+  }catch(err){ toast(err.message, true); }
+  b.disabled = false; b.textContent = "Salvar alterações";
+};
 
 /* ---------- configurações da loja ---------- */
 function linhaFrete(nome="", valor=""){
