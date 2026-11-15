@@ -202,6 +202,12 @@
   .ck-aguarde i{width:10px;height:10px;border-radius:50%;background:var(--cor2);animation:pulso 1s ease-in-out infinite}
   @keyframes pulso{50%{opacity:.25;transform:scale(.7)}}
   .ck-ok{font-size:3.5rem;line-height:1}
+  .ck-opcao{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;text-align:left;background:#fff;border:2px solid var(--borda);border-radius:16px;padding:14px;width:100%;font-family:inherit;color:var(--texto)}
+  .ck-opcao:hover{border-color:var(--cor);background:#faf7ff}
+  .ck-op-ico{font-size:1.8rem;text-align:center}
+  .ck-op-txt b{display:block;font-size:1rem}
+  .ck-op-txt small{color:var(--suave);font-size:.8rem}
+  .ck-op-valor{font-weight:800;font-size:1.05rem;white-space:nowrap}
   @media(max-width:640px){.ck-veu{padding:0}.ck-caixa{border-radius:0;min-height:100%}.ck-grid .m3,.ck-grid .m2,.ck-grid .m4{grid-column:span 6}.ck-grid .m2.uf{grid-column:span 2}.ck-grid .m4.cid{grid-column:span 4}}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--texto);color:#fff;padding:10px 18px;border-radius:999px;font-weight:700;transition:.25s;z-index:60}
   .toast.on{transform:translateX(-50%) translateY(0)}
@@ -299,7 +305,7 @@
   </div>
 </div>
 
-<script src="config.js?v=5"></script>
+<script src="config.js?v=6"></script>
 <script>
 /* =========================================================
    CONFIGURAÇÃO — edite aqui
@@ -594,7 +600,7 @@ function atualizaCarrinho(){
     <div class="linha total"><span>Total</span><span>${brl(total)}</span></div>
     <div class="linha pix"><span>No Pix (${CONFIG.descontoPix*100}% off nos produtos)</span><span>${brl(pixDe(sub)+frete)}</span></div>
     <input id="obs" placeholder="Observação (cor, presente...)">
-    ${temCheckout() ? `<button class="btn" id="pagarPix" type="button">⚡ Pagar com Pix</button>` : ""}
+    ${temCheckout() ? `<button class="btn" id="pagarPix" type="button">${temCartao() ? "💳 Finalizar compra · Pix ou cartão" : "⚡ Pagar com Pix"}</button>` : ""}
     <a class="btn ${temCheckout() ? "sec" : ""}" id="finalizar" target="_blank" rel="noopener" href="#">${temCheckout() ? "Ou peça pelo WhatsApp 💬" : "Finalizar pelo WhatsApp 💬"}</a>
     <button class="btn sec" id="continuar">← Continuar comprando</button>
     <button class="limpar" id="limpar">Esvaziar carrinho</button>`;
@@ -675,7 +681,7 @@ function regiaoPorUF(uf){
 const escH = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const ckDados = () => ler("popzin_cliente", {});
 let ckTimer = null, ckPoll = null, ckObs = "";
-function fecharCheckout(){ clearInterval(ckTimer); clearInterval(ckPoll); $("#ck").classList.remove("on"); $("#ck").setAttribute("aria-hidden","true"); }
+function fecharCheckout(){ clearInterval(ckTimer); clearInterval(ckPoll); desmontarCartao(); $("#ck").classList.remove("on"); $("#ck").setAttribute("aria-hidden","true"); }
 $("#ckFechar").onclick = fecharCheckout;
 
 function abrirCheckout(obs){
@@ -704,7 +710,7 @@ function telaDados(erro){
       <label class="m2 uf" style="grid-column:span 1">UF<select name="uf" required><option value=""></option>${UFS.map(u=>`<option ${u===d.uf?"selected":""}>${u}</option>`).join("")}</select></label>
       <div id="ckResumo" class="ck-resumo" style="grid-column:span 6"></div>
       <label class="ck-aceite" style="grid-column:span 6;color:var(--suave);font-weight:400"><span style="display:flex;gap:8px"><input type="checkbox" name="aceite" required ${d.nome?"checked":""}> <span>Li e aceito a <a href="politica.html" target="_blank" rel="noopener">política de privacidade</a>. Meus dados são usados só para este pedido e a entrega.</span></span></label>
-      <button class="btn" type="submit" style="grid-column:span 6">Gerar Pix ⚡</button>
+      <button class="btn" type="submit" style="grid-column:span 6">Continuar para o pagamento →</button>
     </form>`;
   const f = $("#ckForm");
   const masc = (el, fn) => el.addEventListener("input", () => { el.value = fn(el.value); });
@@ -723,16 +729,122 @@ function telaDados(erro){
     const falta = [...f.querySelectorAll("[required]")].find(el => el.type==="checkbox" ? !el.checked : !el.value.trim());
     if(falta){ falta.focus(); return toast(falta.type==="checkbox" ? "Aceite a política de privacidade" : "Preencha os campos obrigatórios"); }
     salvar("popzin_cliente", dados);
-    const b = f.querySelector("button[type=submit]"); b.disabled = true; b.textContent = "Gerando Pix...";
-    try{
-      const r = await fetch(`${API}/pix`, {method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ cliente: dados, obs: ckObs, itens: itensCarrinho().map(i => ({id:i.p.id, q:i.q, chaveiro:i.c})) })});
-      const j = await r.json().catch(() => ({}));
-      if(!r.ok) throw new Error(j.erro || "Não foi possível gerar o Pix.");
-      salvar("popzin_ultimo_pedido", {id:j.id, t:j.token});
-      telaPix(j);
-    }catch(err){ telaDados(err.message); }
+    ckCliente = dados;
+    temCartao() ? telaEscolha() : gerarPix();
   };
+}
+let ckCliente = null;
+const itensPedido = () => itensCarrinho().map(i => ({id:i.p.id, q:i.q, chaveiro:i.c}));
+function totaisCheckout(uf){
+  const itens = itensCarrinho(), sub = itens.reduce((s,i)=>s+i.un*i.q,0);
+  const reg = uf ? regiaoPorUF(uf) : regiao, gratis = sub >= CONFIG.freteGratisAcima, frete = gratis ? 0 : (+CONFIG.fretes[reg] || 0);
+  return {sub, frete, gratis, reg, pix: pixDe(sub)+frete, cartao: sub+frete};
+}
+async function gerarPix(){
+  $("#ckTitulo").textContent = "Gerando Pix…";
+  $("#ckCorpo").innerHTML = `<div class="ck-pix"><div class="ck-aguarde"><i></i> Gerando o seu Pix…</div></div>`;
+  try{
+    const r = await fetch(`${API}/pix`, {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ cliente: ckCliente, obs: ckObs, itens: itensPedido() })});
+    const j = await r.json().catch(() => ({}));
+    if(!r.ok) throw new Error(j.erro || "Não foi possível gerar o Pix.");
+    salvar("popzin_ultimo_pedido", {id:j.id, t:j.token});
+    telaPix(j);
+  }catch(err){ telaDados(err.message); }
+}
+
+/* ---------- escolha da forma de pagamento ---------- */
+const MP_PK = () => (CK.mpPublicKey || "").trim();
+function temCartao(){ return !!MP_PK(); }
+const maxParcelas = () => Math.max(1, Math.min(12, +CONFIG.maxParcelas || 6));
+function telaEscolha(){
+  const t = totaisCheckout(ckCliente.uf), mx = maxParcelas();
+  $("#ckTitulo").textContent = "Como você quer pagar?";
+  $("#ckCorpo").innerHTML = `
+    <button class="ck-opcao" type="button" id="opPix">
+      <span class="ck-op-ico">⚡</span>
+      <span class="ck-op-txt"><b>Pix</b><small>Aprovação na hora · ${Math.round(CONFIG.descontoPix*100)}% de desconto nos produtos</small></span>
+      <span class="ck-op-valor">${brl(t.pix)}</span>
+    </button>
+    <button class="ck-opcao" type="button" id="opCartao">
+      <span class="ck-op-ico">💳</span>
+      <span class="ck-op-txt"><b>Cartão de crédito ou débito</b><small>${mx > 1 ? `Em até ${mx}x no crédito` : "À vista"} · ambiente seguro do Mercado Pago</small></span>
+      <span class="ck-op-valor">${brl(t.cartao)}</span>
+    </button>
+    <div style="font-size:.8rem;color:var(--suave);text-align:center">Frete ${t.gratis ? "grátis" : `${brl(t.frete)} (${escH(t.reg)})`} já incluído.</div>
+    <button class="btn sec" type="button" id="opVoltar">← Voltar aos meus dados</button>`;
+  $("#opPix").onclick = gerarPix;
+  $("#opCartao").onclick = telaCartao;
+  $("#opVoltar").onclick = () => telaDados();
+}
+
+/* ---------- cartão: formulário seguro do Mercado Pago (Card Payment Brick) ---------- */
+let mpSdk = null, brickCartao = null;
+function carregarScript(src, attrs = {}){
+  return new Promise((ok, erro) => {
+    if(document.querySelector(`script[src="${src}"]`)) return ok();
+    const s = document.createElement("script"); s.src = src; Object.entries(attrs).forEach(([k,v]) => s.setAttribute(k,v));
+    s.onload = ok; s.onerror = () => erro(new Error("Não foi possível carregar o pagamento com cartão.")); document.head.appendChild(s);
+  });
+}
+async function desmontarCartao(){ try{ await brickCartao?.unmount(); }catch(e){} brickCartao = null; }
+async function telaCartao(){
+  const t = totaisCheckout(ckCliente.uf);
+  $("#ckTitulo").textContent = "Pagar com cartão";
+  $("#ckCorpo").innerHTML = `
+    <div class="ck-resumo"><div class="linha total"><b>Total no cartão</b><b>${brl(t.cartao)}</b></div></div>
+    <div id="ckErroCartao"></div>
+    <div id="ckBrick"><div class="ck-aguarde"><i></i> Carregando o formulário seguro…</div></div>
+    <div style="font-size:.78rem;color:var(--suave);text-align:center">🔒 Os dados do cartão são digitados no ambiente do Mercado Pago e não passam pela PopZin.</div>
+    <button class="btn sec" type="button" id="cartaoVoltar">← Escolher outra forma de pagamento</button>`;
+  $("#cartaoVoltar").onclick = async () => { await desmontarCartao(); telaEscolha(); };
+  try{
+    carregarScript("https://www.mercadopago.com/v2/security.js", {view:"checkout"}).catch(() => {});
+    await carregarScript("https://sdk.mercadopago.com/js/v2");
+    mpSdk = mpSdk || new window.MercadoPago(MP_PK(), {locale:"pt-BR"});
+    await desmontarCartao();
+    $("#ckBrick").innerHTML = "";
+    brickCartao = await mpSdk.bricks().create("cardPayment", "ckBrick", {
+      initialization: { amount: +t.cartao.toFixed(2), payer: { email: ckCliente.email, identification: { type: "CPF", number: (ckCliente.cpf||"").replace(/\D/g,"") } } },
+      customization: { paymentMethods: { minInstallments: 1, maxInstallments: maxParcelas() },
+                       visual: { style: { customVariables: { baseColor: "#7b2ff7", borderRadiusMedium: "10px", borderRadiusLarge: "14px" } } } },
+      callbacks: {
+        onReady: () => {},
+        onError: err => { console.error(err); },
+        onSubmit: formData => new Promise(async (resolve, reject) => {
+          $("#ckErroCartao").innerHTML = "";
+          try{
+            const r = await fetch(`${API}/cartao`, {method:"POST", headers:{"Content-Type":"application/json"},
+              body: JSON.stringify({ cliente: ckCliente, obs: ckObs, itens: itensPedido(), cartao: formData, deviceId: window.MP_DEVICE_SESSION_ID || "" })});
+            const j = await r.json().catch(() => ({}));
+            if(!r.ok) throw new Error(j.erro || "Pagamento não aprovado.");
+            salvar("popzin_ultimo_pedido", {id:j.id, t:j.token});
+            resolve(); await desmontarCartao();
+            if(j.status === "pago") telaPago(j, {primeiroNome:(ckCliente.nome||"").split(" ")[0]}); else telaAnalise(j);
+          }catch(err){
+            $("#ckErroCartao").innerHTML = `<div class="ck-erro">${escH(err.message)}</div>`;
+            reject();
+          }
+        }),
+      },
+    });
+  }catch(err){
+    $("#ckBrick").innerHTML = `<div class="ck-erro">${escH(err.message)} Tente o Pix ou recarregue a página.</div>`;
+  }
+}
+function telaAnalise(p){
+  carrinho = {}; salvar("popzin_carrinho", carrinho); atualizaCarrinho(); render();
+  const link = `pedido.html?id=${encodeURIComponent(p.id)}&t=${encodeURIComponent(p.token)}`;
+  $("#ckTitulo").textContent = "Pagamento em análise";
+  $("#ckCorpo").innerHTML = `
+    <div class="ck-pix">
+      <div class="ck-ok">🔎</div>
+      <div>Recebemos o pedido <b>${escH(p.id.toUpperCase())}</b>. O Mercado Pago está analisando o pagamento — isso costuma levar poucos minutos.</div>
+      <div style="font-size:.85rem;color:var(--suave)">📧 Você recebe um e-mail assim que for aprovado.</div>
+      <a class="btn" href="${link}">📦 Acompanhar meu pedido</a>
+      <button class="btn sec" type="button" id="ckVoltar2">Voltar para a loja</button>
+    </div>`;
+  $("#ckVoltar2").onclick = fecharCheckout;
 }
 function resumo(){
   const f = $("#ckForm"); if(!f) return;
@@ -743,7 +855,8 @@ function resumo(){
     ${itens.map(i => `<div class="linha"><span>${i.q}× ${escH(i.p.nome)}${i.c?" 🔑":""}</span><span>${brl(i.un*i.q)}</span></div>`).join("")}
     <div class="linha"><span>Frete ${uf ? `(${escH(reg)})` : "(informe o CEP)"}</span><span>${gratis ? "Grátis" : brl(frete)}</span></div>
     <div class="linha pix"><span>Desconto Pix (${Math.round(CONFIG.descontoPix*100)}% nos produtos)</span><span>− ${brl(sub*CONFIG.descontoPix)}</span></div>
-    <div class="linha total"><b>Total no Pix</b><b>${brl(pixDe(sub)+frete)}</b></div>`;
+    <div class="linha total"><b>Total no Pix</b><b>${brl(pixDe(sub)+frete)}</b></div>
+    ${temCartao() ? `<div class="linha" style="color:var(--suave)"><span>No cartão (${maxParcelas() > 1 ? `até ${maxParcelas()}x` : "à vista"})</span><span>${brl(sub+frete)}</span></div>` : ""}`;
 }
 function telaPix(p){
   $("#ckTitulo").textContent = "Pague com Pix";

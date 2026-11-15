@@ -194,6 +194,7 @@
           <label>Link do Instagram<input id="cInsta"></label>
           <label>Preço do chaveiro (R$) — 0 desliga<input id="cChav" type="number" step="0.01" min="0"></label>
           <label>Prazo das encomendas personalizadas<input id="cPrazo" placeholder="ex.: 7 a 10 dias úteis"></label>
+          <label>Parcelas no cartão (máximo)<select id="cParc"><option value="1">Só à vista</option><option value="2">Até 2x</option><option value="3">Até 3x</option><option value="4">Até 4x</option><option value="5">Até 5x</option><option value="6">Até 6x</option><option value="8">Até 8x</option><option value="10">Até 10x</option><option value="12">Até 12x</option></select></label>
         </div>
         <div style="display:grid;gap:10px;background:var(--fundo);border-radius:14px;padding:14px">
           <b>Faixa do topo do site</b>
@@ -283,7 +284,7 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=5"></script>
+<script src="config.js?v=6"></script>
 <script>
 /* =========================================================
    Painel PopZin — salva direto no repositório via API do GitHub.
@@ -766,7 +767,7 @@ function desenharVendas(){
   $("#vPedidos").innerHTML = (fila ? `<div class="msg ok" style="margin-bottom:10px">✅ ${fila} pedido(s) pago(s) esperando preparo.</div>` : "") +
     (pedidos.length ? `<table><thead><tr><th>Quando</th><th>Cliente</th><th>Itens</th><th>Total</th><th>Andamento</th></tr></thead><tbody>${
     pedidos.map(p => { const c = p.cliente || {}; return `<tr>
-      <td>${p.criado.toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",timeZone:"America/Sao_Paulo"})}<br><small style="color:var(--suave)">${p.origem==="site" ? `⚡ Pix no site<br>${esc((p.id||"").toUpperCase())}` : "💬 WhatsApp"}</small></td>
+      <td>${p.criado.toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",timeZone:"America/Sao_Paulo"})}<br><small style="color:var(--suave)">${p.origem==="site" ? `${p.pagamento==="cartao" ? `💳 Cartão${p.cartao?.tipo==="debit_card" ? " débito" : ` ${p.cartao?.parcelas||1}x`}` : "⚡ Pix"} no site<br>${esc((p.id||"").toUpperCase())}` : "💬 WhatsApp"}</small></td>
       <td>${c.nome ? `<b>${esc(c.nome)}</b><br><a href="https://wa.me/55${esc((c.telefone||"").replace(/^55/,""))}" target="_blank" rel="noopener">${esc(c.telefone||"")}</a>
           <details><summary style="cursor:pointer;color:var(--suave);font-size:.8rem">endereço e CPF</summary><small>${esc(c.rua)}, ${esc(c.numero)}${c.complemento?` — ${esc(c.complemento)}`:""}<br>${esc(c.bairro)} · ${esc(c.cidade)}/${esc(c.uf)}<br>CEP ${esc(c.cep)} · CPF ${esc(c.cpf)}<br>${esc(c.email)}</small></details>`
         : `<small style="color:var(--suave)">${esc(p.regiao||"")}</small>`}</td>
@@ -903,7 +904,7 @@ function linhaFrete(nome="", valor=""){
 function preencherLoja(){
   $("#cLoja").value = loja.loja||""; $("#cWhats").value = loja.whatsapp||""; $("#cFreteGratis").value = loja.freteGratisAcima ?? 120;
   $("#cPix").value = Math.round((loja.descontoPix||0)*1000)/10; $("#cVip").value = loja.linkGrupoVip||""; $("#cInsta").value = loja.instagram||"";
-  $("#cChav").value = loja.precoChaveiro ?? 1; $("#cPrazo").value = loja.prazoEncomenda || ""; $("#cFaixaTitulo").value = loja.faixaTitulo||""; $("#cFaixaSub").value = loja.faixaSub||""; $("#cFaixaOcultar").checked = !!loja.faixaOcultar;
+  $("#cChav").value = loja.precoChaveiro ?? 1; $("#cPrazo").value = loja.prazoEncomenda || ""; $("#cParc").value = String(loja.maxParcelas || 6); $("#cFaixaTitulo").value = loja.faixaTitulo||""; $("#cFaixaSub").value = loja.faixaSub||""; $("#cFaixaOcultar").checked = !!loja.faixaOcultar;
   $("#fretes").innerHTML = ""; Object.entries(loja.fretes||{}).forEach(([n,v]) => linhaFrete(n,v));
   renderTipos();
 }
@@ -915,7 +916,7 @@ $("#btnSalvarLoja").onclick = async () => {
   if(!Object.keys(fretes).length){ b.disabled=false; return toast("Cadastre pelo menos uma região de frete.", true); }
   loja = { ...loja, tipos: tiposDoFormulario(), loja:$("#cLoja").value.trim()||"PopZin", whatsapp:$("#cWhats").value.replace(/\D/g,""), freteGratisAcima:+$("#cFreteGratis").value||0,
            descontoPix:(+$("#cPix").value||0)/100, fretes, linkGrupoVip:$("#cVip").value.trim()||"#", instagram:$("#cInsta").value.trim()||"#",
-           faixaTitulo:$("#cFaixaTitulo").value.trim(), faixaSub:$("#cFaixaSub").value.trim(), faixaOcultar:$("#cFaixaOcultar").checked, precoChaveiro:+$("#cChav").value||0, prazoEncomenda:$("#cPrazo").value.trim() };
+           faixaTitulo:$("#cFaixaTitulo").value.trim(), faixaSub:$("#cFaixaSub").value.trim(), faixaOcultar:$("#cFaixaOcultar").checked, precoChaveiro:+$("#cChav").value||0, prazoEncomenda:$("#cPrazo").value.trim(), maxParcelas:+$("#cParc").value||6 };
   try{ await BD.salvarLoja(loja); toast(modoFB ? "Configurações salvas — já valem no site ✅" : "Configurações salvas ✅"); }
   catch(err){ toast(err.message, true); }
   b.disabled = false;

@@ -39,7 +39,7 @@
 <body>
 <header><a href="index.html"><img src="img/marca/logo-texto.webp" alt="PopZin"></a><a class="btn sec" href="index.html">Voltar à loja</a></header>
 <main id="conteudo"><div class="cartao">Carregando seu pedido…</div></main>
-<script src="config.js?v=5"></script>
+<script src="config.js?v=6"></script>
 <script>
 const API = ((window.POPZIN_CHECKOUT||{}).api||"").replace(/\/+$/,"");
 const q = new URLSearchParams(location.search), id = q.get("id"), t = q.get("t");
@@ -60,6 +60,9 @@ async function carregar(){
     const r = await fetch(`${API}/pedido/${encodeURIComponent(id)}?t=${encodeURIComponent(t)}`);
     const p = await r.json();
     if(!r.ok) throw new Error(p.erro || "Pedido não encontrado.");
+    if(p.pagamento === "cartao") PASSOS[0] = p.status === "aguardando"
+      ? ["aguardando","🔎","Pagamento em análise","O Mercado Pago está analisando o pagamento com cartão"]
+      : ["aguardando","🧾","Pedido recebido",`Pago no cartão${p.cartao?.parcelas > 1 ? ` em ${p.cartao.parcelas}x` : ""}`];
     const idx = PASSOS.findIndex(s => s[0] === p.status);
     const quando = st => (p.historico||[]).filter(h => h.status === st).map(h => dataBR(h.em)).pop() || "";
     const expirado = p.status === "expirado", cancelado = p.status === "cancelado";

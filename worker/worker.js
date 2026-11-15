@@ -3,6 +3,7 @@
    ---------------------------------------------------------------------
    Rotas:
      POST /pix            cria o pedido + cobrança Pix no Mercado Pago
+     POST /cartao         paga com cartão (token do formulário seguro do Mercado Pago)
      GET  /pedido/:id?t=  status do pedido para o cliente (link secreto)
      POST /webhook        aviso do Mercado Pago (pagamento aprovado)
      POST /notificar      painel avisa mudança de status → e-mail ao cliente
@@ -27,6 +28,7 @@ export default {
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     try {
       if (req.method === "POST" && url.pathname === "/pix") return json(await criarPix(req, env, url), 200, cors);
+      if (req.method === "POST" && url.pathname === "/cartao") return json(await pagarCartao(req, env, url), 200, cors);
       const m = url.pathname.match(/^\/pedido\/([a-z0-9]{6,40})$/);
       if (req.method === "GET" && m) return json(await statusPedido(m[1], url.searchParams.get("t") || "", env), 200, cors);
       if (req.method === "POST" && url.pathname === "/notificar") return json(await notificar(req, env), 200, { ...cors, "Access-Control-Allow-Headers": "Content-Type, Authorization" });
@@ -169,9 +171,7 @@ async function mp(env, caminho, opts = {}) {
 }
 
 /* ------------------------------------------------------------ rotas */
-async function criarPix(req, env, url) {
-  const b = await req.json().catch(() => null);
-  if (!b) throw erroPublico("Dados inválidos.");
+function lerCliente(b) {
   const c = b.cliente || {};
   const cliente = {
     nome: so(c.nome, 80), email: so(c.email, 120).toLowerCase(), cpf: digitos(c.cpf), telefone: digitos(c.telefone).slice(0, 13),
@@ -183,6 +183,23 @@ async function criarPix(req, env, url) {
   if (!cpfValido(cliente.cpf)) throw erroPublico("CPF inválido.");
   if (cliente.telefone.length < 10) throw erroPublico("Telefone inválido.");
   if (cliente.cep.length !== 8 || !cliente.rua || !cliente.numero || !cliente.cidade || cliente.uf.length !== 2) throw erroPublico("Endereço incompleto.");
+  return cliente;
+}
+/* dados extras que aumentam a aprovação no Mercado Pago (itens, comprador, entrega) */
+function infoAdicional(calc, cliente) {
+  const [nome1, ...resto] = cliente.nome.split(/\s+/);
+  return {
+    items: calc.itens.map(i => ({ id: String(i.id), title: i.nome + (i.chaveiro ? " + chaveiro" : ""), quantity: i.q, unit_price: i.un, category_id: "toys" })),
+    payer: { first_name: nome1, last_name: resto.join(" "), phone: { area_code: cliente.telefone.slice(0, 2), number: cliente.telefone.slice(2) },
+             address: { zip_code: cliente.cep, street_name: cliente.rua, street_number: cliente.numero } },
+    shipments: { receiver_address: { zip_code: cliente.cep, state_name: cliente.uf, city_name: cliente.cidade, street_name: cliente.rua, street_number: cliente.numero } },
+  };
+}
+
+async function criarPix(req, env, url) {
+  const b = await req.json().catch(() => null);
+  if (!b) throw erroPublico("Dados inválidos.");
+  const cliente = lerCliente(b);
 
   const [produtos, cfg] = await Promise.all([listarProdutos(env), lerConfig(env)]);
   const calc = calcular(b.itens, produtos, cfg, cliente.uf);
@@ -201,6 +218,7 @@ async function criarPix(req, env, url) {
       notification_url: `${url.origin}/webhook`,
       date_of_expiration: isoBrasilia(new Date(agora.getTime() + 31 * 60e3)),   // mínimo do MP é 30 min; a loja cancela aos 5
       payer: { email: cliente.email, first_name: nome1, last_name: resto.join(" "), identification: { type: "CPF", number: cliente.cpf } },
+      additional_info: infoAdicional(calc, cliente), statement_descriptor: "POPZIN",
     }),
   });
   const td = pg.point_of_interaction?.transaction_data || {};
@@ -214,6 +232,59 @@ async function criarPix(req, env, url) {
            qr: dados.qr, qrImg: dados.qrImg, ticket: dados.ticket };
 }
 
+const MOTIVOS_RECUSA = {
+  cc_rejected_bad_filled_card_number: "Confira o número do cartão.",
+  cc_rejected_bad_filled_date: "Confira a data de validade.",
+  cc_rejected_bad_filled_security_code: "Confira o código de segurança (CVV).",
+  cc_rejected_bad_filled_other: "Confira os dados do cartão.",
+  cc_rejected_insufficient_amount: "O cartão não tem limite suficiente.",
+  cc_rejected_call_for_authorize: "O banco pediu autorização: ligue para o banco e tente de novo.",
+  cc_rejected_card_disabled: "Cartão desativado: ligue para o banco para ativá-lo.",
+  cc_rejected_duplicated_payment: "Você já fez um pagamento com esse valor. Se precisar pagar de novo, use outro cartão ou o Pix.",
+  cc_rejected_high_risk: "Pagamento recusado por segurança. Tente outro cartão ou pague com Pix.",
+  cc_rejected_max_attempts: "Limite de tentativas atingido. Tente outro cartão ou pague com Pix.",
+  cc_rejected_blacklist: "Não foi possível processar este cartão. Tente outro ou pague com Pix.",
+  cc_rejected_other_reason: "O banco recusou o pagamento. Tente outro cartão ou pague com Pix.",
+};
+async function pagarCartao(req, env, url) {
+  const b = await req.json().catch(() => null);
+  if (!b || !b.cartao?.token) throw erroPublico("Dados do cartão incompletos.");
+  const cliente = lerCliente(b);
+  const [produtos, cfg] = await Promise.all([listarProdutos(env), lerConfig(env)]);
+  const calc = calcular(b.itens, produtos, cfg, cliente.uf);
+  const total = calc.total;                                    // cartão: sem o desconto do Pix
+  const maxParc = Math.max(1, Math.min(12, +cfg.maxParcelas || 6));
+  const parcelas = Math.max(1, Math.min(maxParc, Math.floor(+b.cartao.installments || 1)));
+  const id = "pz" + Date.now().toString(36) + hex(2);
+  const token = hex(12);
+  const agora = new Date();
+  const doc = b.cartao.payer?.identification?.number ? b.cartao.payer.identification : { type: "CPF", number: cliente.cpf };
+  const [nome1, ...resto] = cliente.nome.split(/\s+/);
+
+  const pg = await mp(env, "/v1/payments", {
+    method: "POST", headers: { "X-Idempotency-Key": id, ...(b.deviceId ? { "X-meli-session-id": so(b.deviceId, 100) } : {}) },
+    body: JSON.stringify({
+      transaction_amount: total, token: b.cartao.token, installments: parcelas,
+      payment_method_id: so(b.cartao.payment_method_id, 30), ...(b.cartao.issuer_id ? { issuer_id: String(b.cartao.issuer_id) } : {}),
+      description: `PopZin — pedido ${id.toUpperCase()}`, external_reference: id, statement_descriptor: "POPZIN",
+      notification_url: `${url.origin}/webhook`,
+      payer: { email: cliente.email, first_name: nome1, last_name: resto.join(" "), identification: { type: so(doc.type, 10) || "CPF", number: digitos(doc.number) } },
+      additional_info: infoAdicional(calc, cliente),
+    }),
+  }).catch(e => { if (e.mpStatus && e.mpStatus < 500) throw erroPublico("Não foi possível processar o cartão. Confira os dados ou pague com Pix."); throw e; });
+
+  if (pg.status === "rejected" || pg.status === "cancelled")
+    throw erroPublico(MOTIVOS_RECUSA[pg.status_detail] || "Pagamento recusado. Tente outro cartão ou pague com Pix.", 402);
+
+  const cartaoInfo = { bandeira: pg.payment_method_id, tipo: pg.payment_type_id, parcelas: pg.installments || parcelas, final: pg.card?.last_four_digits || "" };
+  const dados = { id, origem: "site", criado: agora.toISOString(), pagamento: "cartao", mpId: String(pg.id), cartao: cartaoInfo,
+                  cliente, obs: so(b.obs, 300), ...calc, total, totalSemPix: total, historico: [{ status: "aguardando", em: agora.toISOString() }] };
+  await fs(env, `/pedidos?documentId=${id}`, { method: "POST", body: JSON.stringify({ fields: camposPedido(dados, "aguardando", {
+    mpId: { stringValue: String(pg.id) }, token: { stringValue: token } }) }) });
+  if (pg.status === "approved") { const ped = await lerPedido(env, id); if (ped) await aplicarPagamento(env, ped, pg); }
+  return { id, token, total, status: pg.status === "approved" ? "pago" : "analise", parcelas: cartaoInfo.parcelas };
+}
+
 async function statusPedido(id, t, env) {
   let ped = await lerPedido(env, id);
   if (!ped || !t || ped.doc.fields.token?.stringValue !== t) throw erroPublico("Pedido não encontrado.", 404);
@@ -223,6 +294,7 @@ async function statusPedido(id, t, env) {
     id, status: ped.status, criado: d.criado, expiraEm: d.expiraEm, total: d.total, frete: d.frete, regiao: d.regiao,
     itens: (d.itens || []).map(i => ({ nome: i.nome, q: i.q, chaveiro: i.chaveiro, un: i.un })),
     rastreio: d.rastreio || "", historico: d.historico || [], primeiroNome: (d.cliente?.nome || "").split(" ")[0],
+    pagamento: d.pagamento || "pix", cartao: d.cartao ? { parcelas: d.cartao.parcelas, final: d.cartao.final, tipo: d.cartao.tipo } : null,
     ...(ped.status === "aguardando" ? { qr: d.qr, qrImg: d.qrImg } : {}),
   };
 }
@@ -239,7 +311,9 @@ async function webhook(req, url, env) {
   const ref = pg.external_reference;
   if (!ref || !/^pz[a-z0-9]+$/.test(ref)) return;
   const ped = await lerPedido(env, ref);
-  if (ped) await aplicarPagamento(env, ped, pg);
+  if (!ped) return;
+  if (pg.status === "approved") await aplicarPagamento(env, ped, pg);
+  else if (ped.status === "aguardando") await sincronizar(env, ped);
 }
 
 /* --------------------------------------- confirmação e expiração */
@@ -248,6 +322,13 @@ async function sincronizar(env, ped) {
   if (!mpId) return;
   const pg = await mp(env, `/v1/payments/${mpId}`);
   if (pg.status === "approved") return aplicarPagamento(env, ped, pg);
+  if (ped.dados.pagamento === "cartao") {                                    // cartão em análise: espera o Mercado Pago decidir
+    if (["rejected", "cancelled", "refunded", "charged_back"].includes(pg.status)) {
+      const dados = { ...ped.dados, historico: [...(ped.dados.historico || []), { status: "cancelado", em: new Date().toISOString() }] };
+      await gravarPedidoSe(env, ped, dados, "cancelado");
+    }
+    return;
+  }
   if (Date.now() > Date.parse(ped.dados.expiraEm)) {
     try { await mp(env, `/v1/payments/${mpId}`, { method: "PUT", body: JSON.stringify({ status: "cancelled" }) }); }
     catch (e) { const de = await mp(env, `/v1/payments/${mpId}`); if (de.status === "approved") return aplicarPagamento(env, ped, de); }
