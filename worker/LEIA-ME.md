@@ -32,3 +32,8 @@ Nunca coloque o Access Token nem a conta de serviço no GitHub: só nas variáve
   2. Copie a **Site Key** para `turnstileSiteKey` no `config.js` (é pública).
   3. Copie a **Secret Key** para o Worker `popzin-api` → Settings → Variables and Secrets → tipo **Secret**, nome `TURNSTILE_SECRET`.
   Sem esses dois, o site e o servidor funcionam normalmente, só sem o "não sou robô".
+
+## Aviso de pedido pago para a loja
+
+- **E-mail:** cadastre o segredo `AVISO_EMAIL` no Worker (Settings → Variables and Secrets → tipo Secret) com o e-mail que recebe os avisos. Vários: separe por vírgula.
+- **Painel:** com o painel aberto (pode ser em outra aba), ele confere a cada 45 s e toca um som + mostra uma notificação. Clique em "🔕 Ligar avisos" uma vez para permitir.

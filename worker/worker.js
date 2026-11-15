@@ -390,6 +390,7 @@ async function aplicarPagamento(env, ped, pg) {
   dados.emails = { ...(dados.emails || {}), [chaveEmail]: agora };
   if (!(await gravarPedidoSe(env, ped, dados, "pago"))) return;              // outro processo chegou antes
   try { await enviarEmailStatus(env, dados, ped.doc.fields.token?.stringValue, "pago"); } catch (e) { console.error("email pago", dados.id, e.message); }
+  try { await avisarDono(env, dados); } catch (e) { console.error("aviso dono", dados.id, e.message); }
   // baixa de estoque e soma de vendidos
   const produtos = await listarProdutos(env);
   const soma = {};
@@ -460,6 +461,32 @@ async function enviarEmailStatus(env, d, token, status) {
       html, text: `${TEXTOS[status][0]}\n\n${TEXTOS[status][1]}\n\nAcompanhe seu pedido: ${link}${status === "enviado" && d.rastreio ? `\nRastreio: ${d.rastreio}` : ""}` }),
   });
   if (!r.ok) throw new Error(`Resend ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  return true;
+}
+
+/* aviso para a loja quando entra um pedido pago.
+   O(s) e-mail(s) ficam no segredo AVISO_EMAIL do Cloudflare (separe vários por vírgula). */
+async function avisarDono(env, d) {
+  const para = String(env.AVISO_EMAIL || "").split(",").map(x => x.trim()).filter(x => /@/.test(x));
+  if (!env.RESEND_API_KEY || !para.length) return false;
+  const c = d.cliente || {};
+  const forma = d.pagamento === "cartao" ? `💳 Cartão${d.cartao?.tipo === "debit_card" ? " débito" : ` ${d.cartao?.parcelas || 1}x`}` : "⚡ Pix";
+  const linhas = (d.itens || []).map(i => `<tr><td style="padding:4px 8px">${i.q}× ${escE(i.nome)}${i.chaveiro ? " + chaveiro" : ""}</td><td style="padding:4px 8px;text-align:right">${brlE(i.un * i.q)}</td></tr>`).join("");
+  const painel = `${(env.SITE_URL || "https://popzin.com.br").replace(/\/$/, "")}/admin.html`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#1d1640">
+    <h2 style="color:#7b2ff7;margin:0 0 6px">🎉 Novo pedido pago!</h2>
+    <p style="margin:0 0 14px">Pedido <b>${escE(d.id.toUpperCase())}</b> · ${forma} · <b>${brlE(d.total)}</b></p>
+    <table style="width:100%;border-collapse:collapse;background:#faf7ff;border-radius:10px">${linhas}
+      <tr><td style="padding:4px 8px">Frete</td><td style="padding:4px 8px;text-align:right">${d.frete ? brlE(d.frete) : "Grátis"}</td></tr></table>
+    <p style="margin:14px 0 4px"><b>${escE(c.nome)}</b> · ${escE(c.telefone)}<br>${escE(c.rua)}, ${escE(c.numero)}${c.complemento ? " - " + escE(c.complemento) : ""} · ${escE(c.bairro)}<br>${escE(c.cidade)}/${escE(c.uf)} · CEP ${escE(c.cep)}</p>
+    ${d.obs ? `<p style="background:#fff6d6;padding:8px;border-radius:8px">📝 ${escE(d.obs)}</p>` : ""}
+    <p><a href="${painel}" style="background:#7b2ff7;color:#fff;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:bold">Abrir o painel</a></p></div>`;
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `${d.id}-aviso-dono` },
+    body: JSON.stringify({ from: env.EMAIL_DE || "PopZin <pedidos@popzin.com.br>", to: para, subject: `🎉 Novo pedido pago — ${d.id.toUpperCase()} — ${brlE(d.total)}`,
+      html, text: `Novo pedido pago ${d.id.toUpperCase()} — ${brlE(d.total)} (${forma})\n${(d.itens || []).map(i => `${i.q}x ${i.nome}`).join("\n")}\n${c.nome} · ${c.cidade}/${c.uf}\nPainel: ${painel}` }),
+  });
+  if (!r.ok) throw new Error(`Resend ${r.status}`);
   return true;
 }
 

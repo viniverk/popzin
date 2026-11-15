@@ -139,6 +139,7 @@
         <button class="aba" data-aba="loja">⚙️ Loja</button>
       </div>
       <div style="display:flex;gap:8px">
+        <button class="btn sec oculto" type="button" id="btnAvisos" title="Tocar um som e mostrar um aviso quando entrar um pedido pago">🔔 Avisos</button>
         <a class="btn sec" href="index.html" target="_blank" rel="noopener" style="text-decoration:none">Ver loja ↗</a>
         <button class="btn sec" id="btnSair">Sair</button>
       </div>
@@ -529,6 +530,7 @@ $("#btnSair").onclick = async () => {
 
 async function entrarNoPainel(){
   mostrar("#telaPainel");
+  if(modoFB) iniciarVigia();
   $("#tabela").innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--suave);padding:30px">Carregando...</td></tr>`;
   try{
     produtos = await BD.lerProdutos();
@@ -700,6 +702,55 @@ async function fsConsulta(colecao, desde){
     return {...json, id:d.name.split("/").pop(), criado:new Date(d.fields.criado?.timestampValue || d.createTime),
             tipo:d.fields.tipo?.stringValue, status:d.fields.status?.stringValue || "novo"};
   });
+}
+/* ---------- aviso de pedido pago (som + notificação + título da aba) ---------- */
+let vigiaPagos = null, vigiaTimer = null, novosPagos = 0, ctxAudio = null;
+const tituloOriginal = document.title;
+function somPedido(){
+  try{
+    ctxAudio = ctxAudio || new (window.AudioContext || window.webkitAudioContext)();
+    [880, 1175, 1568].forEach((f, i) => {
+      const o = ctxAudio.createOscillator(), g = ctxAudio.createGain(), t = ctxAudio.currentTime + i*0.16;
+      o.frequency.value = f; o.type = "sine"; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t+0.02); g.gain.exponentialRampToValueAtTime(0.0001, t+0.3);
+      o.connect(g).connect(ctxAudio.destination); o.start(t); o.stop(t+0.32);
+    });
+  }catch(e){}
+}
+function botaoAvisos(){
+  const b = $("#btnAvisos"); if(!b) return; b.classList.remove("oculto");
+  const ok = "Notification" in window && Notification.permission === "granted";
+  b.textContent = ok ? "🔔 Avisos ligados" : "🔕 Ligar avisos";
+}
+async function vigiar(){
+  try{
+    const desde = new Date(Date.now() - 3*864e5);
+    const pagos = (await fsConsulta("pedidos", desde)).filter(p => p.origem === "site" && CONTA.includes(p.status));
+    if(vigiaPagos === null){ vigiaPagos = new Set(pagos.map(p => p.id)); return; }      // 1ª leitura: só memoriza
+    const novos = pagos.filter(p => !vigiaPagos.has(p.id));
+    novos.forEach(p => vigiaPagos.add(p.id));
+    if(!novos.length) return;
+    novosPagos += novos.length;
+    document.title = `(${novosPagos}) 🎉 Pedido pago! · ${tituloOriginal}`;
+    somPedido();
+    const p = novos[0];
+    toast(`🎉 Novo pedido pago: ${(p.id||"").toUpperCase()} · ${brl(p.total)}${novos.length > 1 ? ` (+${novos.length-1})` : ""}`);
+    if("Notification" in window && Notification.permission === "granted"){
+      const n = new Notification("🎉 Novo pedido pago!", { body: `${(p.id||"").toUpperCase()} · ${brl(p.total)} · ${(p.cliente?.nome||"").split(" ")[0]} (${p.cliente?.cidade||""})`, icon: "img/marca/icone-192.png", tag: "pedido-"+p.id });
+      n.onclick = () => { window.focus(); document.querySelector('[data-aba="vendas"]')?.click(); n.close(); };
+    }
+    if(!$("#abaVendas").classList.contains("oculto")) carregarVendas();
+  }catch(e){ console.warn("vigia", e.message); }
+}
+function iniciarVigia(){
+  botaoAvisos();
+  $("#btnAvisos").onclick = async () => {
+    somPedido();                                                   // libera o som no navegador (precisa de um clique)
+    if("Notification" in window && Notification.permission === "default") await Notification.requestPermission();
+    botaoAvisos();
+    toast(("Notification" in window && Notification.permission === "granted") ? "Avisos ligados: deixe o painel aberto (pode ser em outra aba) 🔔" : "Som ligado. Para notificações, permita no cadeado ao lado do endereço.");
+  };
+  clearInterval(vigiaTimer); vigiar(); vigiaTimer = setInterval(vigiar, 45000);
+  document.addEventListener("visibilitychange", () => { if(!document.hidden){ novosPagos = 0; document.title = tituloOriginal; } });
 }
 let vendasCache = null;
 const diaKey = d => d.toLocaleDateString("sv-SE", {timeZone:"America/Sao_Paulo"});   // AAAA-MM-DD no fuso de Brasília
