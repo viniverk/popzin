@@ -34,7 +34,9 @@ export default {
       const m = url.pathname.match(/^\/pedido\/([a-z0-9]{6,40})$/);
       if (req.method === "GET" && m) return json(await statusPedido(m[1], url.searchParams.get("t") || "", env), 200, cors);
       if (req.method === "POST" && url.pathname === "/notificar") return json(await notificar(req, env), 200, { ...cors, "Access-Control-Allow-Headers": "Content-Type, Authorization" });
-      if (url.pathname === "/webhook") { ctx?.waitUntil ? ctx.waitUntil(webhook(req, url, env)) : await webhook(req, url, env); return new Response("ok"); }
+      if (url.pathname === "/webhook") {
+        if (!(await assinaturaValida(req, url, env))) return new Response("assinatura inválida", { status: 401 });
+        ctx?.waitUntil ? ctx.waitUntil(webhook(req, url, env)) : await webhook(req, url, env); return new Response("ok"); }
       if (url.pathname === "/") return json({ ok: true, servico: "PopZin pagamentos" }, 200, cors);
       return json({ erro: "Rota não encontrada" }, 404, cors);
     } catch (e) {
@@ -339,6 +341,25 @@ async function statusPedido(id, t, env) {
     pagamento: d.pagamento || "pix", cartao: d.cartao ? { parcelas: d.cartao.parcelas, final: d.cartao.final, tipo: d.cartao.tipo } : null,
     ...(ped.status === "aguardando" ? { qr: d.qr, qrImg: d.qrImg } : {}),
   };
+}
+
+/* confere a assinatura x-signature do Mercado Pago (HMAC-SHA256 com o segredo MP_WEBHOOK_SECRET).
+   Sem o segredo cadastrado, ou aviso sem assinatura: segue, porque o pagamento é sempre reconsultado no MP. */
+async function assinaturaValida(req, url, env) {
+  const segredo = env.MP_WEBHOOK_SECRET, xs = req.headers.get("x-signature");
+  if (!segredo) return true;
+  if (!xs) { console.warn("webhook sem assinatura"); return true; }
+  let ts = "", v1 = "";
+  for (const parte of xs.split(",")) { const i = parte.indexOf("="); if (i < 0) continue; const k = parte.slice(0, i).trim(), v = parte.slice(i + 1).trim(); if (k === "ts") ts = v; if (k === "v1") v1 = v; }
+  if (!ts || !v1) return false;
+  const dataId = (url.searchParams.get("data.id") || "").toLowerCase(), reqId = req.headers.get("x-request-id") || "";
+  const manifest = (dataId ? `id:${dataId};` : "") + (reqId ? `request-id:${reqId};` : "") + `ts:${ts};`;
+  const chave = await crypto.subtle.importKey("raw", new TextEncoder().encode(segredo), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const calc = hexDe(await crypto.subtle.sign("HMAC", chave, new TextEncoder().encode(manifest)));
+  if (calc.length !== v1.length) return false;
+  let dif = 0; for (let i = 0; i < calc.length; i++) dif |= calc.charCodeAt(i) ^ v1.toLowerCase().charCodeAt(i);
+  if (dif) console.warn("webhook com assinatura inválida");
+  return dif === 0;
 }
 
 async function webhook(req, url, env) {

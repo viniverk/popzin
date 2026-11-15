@@ -37,3 +37,10 @@ Nunca coloque o Access Token nem a conta de serviço no GitHub: só nas variáve
 
 - **E-mail:** cadastre o segredo `AVISO_EMAIL` no Worker (Settings → Variables and Secrets → tipo Secret) com o e-mail que recebe os avisos. Vários: separe por vírgula.
 - **Painel:** com o painel aberto (pode ser em outra aba), ele confere a cada 45 s e toca um som + mostra uma notificação. Clique em "🔕 Ligar avisos" uma vez para permitir.
+
+## Assinatura dos avisos do Mercado Pago (webhook)
+
+1. Mercado Pago Developers → Suas integrações → PopZin → Webhooks → Configurar notificações → **Modo produtivo**.
+2. URL: `https://popzin-api.discipulos-pagamento.workers.dev/webhook`, evento **Pagamentos** → Salvar.
+3. Revele a **assinatura secreta** e cadastre no Worker como Secret `MP_WEBHOOK_SECRET`.
+Avisos com assinatura errada passam a ser recusados (401).
