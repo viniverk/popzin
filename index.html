@@ -228,6 +228,7 @@
   .ck-aguarde i{width:10px;height:10px;border-radius:50%;background:var(--cor2);animation:pulso 1s ease-in-out infinite}
   @keyframes pulso{50%{opacity:.25;transform:scale(.7)}}
   .ck-ok{font-size:3.5rem;line-height:1}
+  .ck-recebedor{font-size:.82rem;line-height:1.4;background:#eef9f1;border:1px solid #cdebd6;color:#1d5a32;border-radius:12px;padding:8px 10px;text-align:left}
   .ck-parc{background:#faf7ff;border:1px solid var(--borda);border-radius:14px;padding:10px 14px}
   .ck-parc summary{cursor:pointer;font-weight:700;color:var(--cor)}
   .ck-parc .linha{display:flex;justify-content:space-between;font-size:.9rem;padding:5px 0;border-bottom:1px dashed var(--borda)}
@@ -1003,6 +1004,7 @@ function telaPix(p){
       <div style="font-size:.85rem">Ou copie o código e cole no app do seu banco (Pix copia e cola):</div>
       <div class="ck-codigo" id="ckCod">${escH(p.qr)}</div>
       <button class="btn" type="button" id="ckCopiar">📋 Copiar código Pix</button>
+      <div class="ck-recebedor">🔒 No app do banco e no comprovante, o recebedor aparece como <b>${escH((CONFIG.nomePix||"").trim() || "o titular da conta Mercado Pago da PopZin")}</b>${(CONFIG.nomePix||"").trim() ? " (via Mercado Pago)" : ""}. Pode pagar tranquilo: é a conta oficial da PopZin.</div>
       <div class="ck-aguarde"><i></i> Aguardando o pagamento… a tela muda sozinha quando cair.</div>
     </div>`;
   $("#ckCopiar").onclick = async () => {
