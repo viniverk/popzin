@@ -117,6 +117,8 @@
   .selo{position:absolute;top:8px;left:8px;background:var(--cor);color:#fff;font-size:.72rem;font-weight:800;border-radius:8px;padding:3px 8px}
   .selo.novo{background:var(--cor2)}
   .selo.esgot{background:#9a8f8a}
+  .selo.enc{background:#ff8a00}
+  .enc-info{font-size:.78rem;color:#8a4b00;background:#fff3e0;border-radius:10px;padding:6px 8px;margin:6px 0 2px;line-height:1.3}
   .cores{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 2px}
   .cor-bola{width:22px;height:22px;border-radius:50%;background:var(--c);border:2px solid #fff;box-shadow:0 0 0 1px var(--borda);padding:0;cursor:pointer;position:relative}
   .cor-bola.on{box-shadow:0 0 0 2px var(--cor)}
@@ -482,7 +484,8 @@ async function iniciar(){
     try { CONFIG = {...CONFIG, ...(await carregarJSON("loja.json"))}; } catch(e){}
     try { const p = await carregarJSON("produtos.json"); if(Array.isArray(p)) PRODUTOS = p; } catch(e){}
   }
-  PRODUTOS.forEach(p => { p.preco=+p.preco||0; p.de=+p.de||0; p.estoque=+p.estoque||0; p.vendidos=+p.vendidos||0; });
+  PRODUTOS.forEach(p => { p.preco=+p.preco||0; p.de=+p.de||0; p.estoque=+p.estoque||0; p.vendidos=+p.vendidos||0; p.encomenda=!!p.encomenda;
+    if(p.encomenda) (p.cores||[]).forEach(c => c._enc = true); });
   carrinho = Object.fromEntries(Object.entries(carrinho).filter(([k]) => { const {id, cor} = lerChave(k), p = PRODUTOS.find(x => x.id === id);
     if(!p) return false; const cs = coresDe(p); return cs.length ? cs.some(c => c.id === cor && !semCor(c)) : !cor; }));
   if(!CONFIG.fretes[regiao]) regiao = Object.keys(CONFIG.fretes)[0];
@@ -565,11 +568,12 @@ const chave = (id, c, cor) => `${id}${c ? ":c" : ""}${cor ? "@" + cor : ""}`;
 const lerChave = k => { const [base, cor = ""] = String(k).split("@"); const [id, c] = base.split(":"); return {id:+id, c: c==="c", cor}; };
 /* variações de cor (opcional): p.cores = [{id, nome, hex, foto, esgotado}] */
 const coresDe = p => Array.isArray(p.cores) ? p.cores.filter(c => c && c.id && c.nome) : [];
+const prazoDe = p => String(p.prazo || "").trim() || String(CONFIG.prazoEncomenda || "").trim();
 const corDe = (p, id) => coresDe(p).find(c => c.id === id) || null;
-const estoqueCor = c => !c ? Infinity : c.esgotado ? 0 : (c.estoque === undefined || c.estoque === null || c.estoque === "" ? Infinity : Math.max(0, +c.estoque || 0));
+const estoqueCor = c => !c || c._enc ? Infinity : c.esgotado ? 0 : (c.estoque === undefined || c.estoque === null || c.estoque === "" ? Infinity : Math.max(0, +c.estoque || 0));
 const semCor = c => estoqueCor(c) <= 0;
 const qtdDaCor = (id, cor) => Object.entries(carrinho).reduce((s,[k,q]) => { const l = lerChave(k); return s + (l.id === id && l.cor === cor ? q : 0); }, 0);
-const podeMais = (p, cor) => qtdNoCarrinho(p.id) < p.estoque && (!cor || qtdDaCor(p.id, cor) < estoqueCor(corDe(p, cor)));
+const podeMais = (p, cor) => p.encomenda ? qtdNoCarrinho(p.id) < 20 : qtdNoCarrinho(p.id) < p.estoque && (!cor || qtdDaCor(p.id, cor) < estoqueCor(corDe(p, cor)));
 const fotoDe = (p, corId) => corDe(p, corId)?.foto || p.foto || "";
 /* galeria: foto principal (ou da cor) + fotos extras (frente, traseira…). A cor pode ter as próprias extras. */
 const galeriaDe = (p, corId) => { const c = corDe(p, corId), extras = (c && Array.isArray(c.fotos) && c.fotos.length) ? c.fotos : (Array.isArray(p.fotos) ? p.fotos : []);
@@ -591,8 +595,8 @@ const precoBase = (p, qtd) => temCombo(p) && qtd >= +p.promoQtd ? +p.promoPreco 
 function card(p){
   const off = p.de ? Math.round((1-p.preco/p.de)*100) : 0;
   const cs = coresDe(p), cAtual = corInicial(p), foto = fotoDe(p, cAtual);
-  const esg = !p.estoque;
-  const selo = esg ? `<span class="selo esgot">ESGOTADO</span>` : off ? `<span class="selo">-${off}%</span>` : p.novo ? `<span class="selo novo">NOVO</span>` : "";
+  const esg = !p.encomenda && !p.estoque;
+  const selo = esg ? `<span class="selo esgot">ESGOTADO</span>` : p.encomenda ? `<span class="selo enc">SOB ENCOMENDA</span>` : off ? `<span class="selo">-${off}%</span>` : p.novo ? `<span class="selo novo">NOVO</span>` : "";
   return `<div class="card" data-pid="${p.id}">
     <div class="foto" style="background:${p.cor||'#f5eee9'}">
       ${foto ? `<img src="${mini(foto)}" alt="${p.nome}" loading="lazy" data-foto-de="${p.id}" onerror="if(this.dataset.orig&&this.src!==this.dataset.orig)this.src=this.dataset.orig" data-orig="${foto}">` : (p.emoji||'🐾')}
@@ -609,6 +613,7 @@ function card(p){
         ${p.de?`<span class="de">${brl(p.de)}</span>`:""}<span class="preco">${brl(p.preco)}</span>
         <div class="pix">${brl(pixDe(p.preco))} no Pix</div>
       </div>
+      ${p.encomenda ? `<div class="enc-info">🛠️ Feito sob encomenda${prazoDe(p) ? ` · produção em <b>${escH(prazoDe(p))}</b>` : ""}</div>` : ""}
       ${!esg && temCombo(p) ? `<div class="combo">🔥 Leve ${p.promoQtd}+: <b>${brl(+p.promoPreco)}</b> cada</div>` : ""}
       ${!esg && aceitaChav(p) ? `<label class="chav"><input type="checkbox" data-chav="${p.id}"> <span>🔑 Chaveiro</span> <b>+${brl(precoChav())}</b></label>` : ""}
       ${esg
@@ -672,7 +677,7 @@ function atualizaCarrinho(){
   $("#gItens").innerHTML = itens.map(({k,p,q,c,un,combo,falta,corNome,foto})=>`
     <div class="item">
       <div class="mini" style="background:${p.cor||'#f5eee9'}">${foto?`<img src="${mini(foto,"t")}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`:(p.emoji||'🐾')}</div>
-      <div class="txt"><b>${p.nome}</b>${corNome?` <span class="cor-nome">· ${escH(corNome)}</span>`:""}<br>${combo?`<s class="de">${brl(p.preco+(c?precoChav():0))}</s> `:""}${brl(un)} un.${combo?` <span class="tag-combo">🔥 combo</span>`:""}${falta?`<div class="dica-combo">+${falta} e paga ${brl(+p.promoPreco)} cada</div>`:""}${aceitaChav(p)?`<label class="chav chav-mini"><input type="checkbox" data-trocachav="${k}" ${c?"checked":""}> <span>🔑 Chaveiro</span> <b>+${brl(precoChav())}</b></label>`:""}</div>
+      <div class="txt"><b>${p.nome}</b>${corNome?` <span class="cor-nome">· ${escH(corNome)}</span>`:""}${p.encomenda?`<div class="enc-info" style="margin:3px 0">🛠️ Sob encomenda${prazoDe(p)?` · ${escH(prazoDe(p))}`:""}</div>`:"<br>"}${combo?`<s class="de">${brl(p.preco+(c?precoChav():0))}</s> `:""}${brl(un)} un.${combo?` <span class="tag-combo">🔥 combo</span>`:""}${falta?`<div class="dica-combo">+${falta} e paga ${brl(+p.promoPreco)} cada</div>`:""}${aceitaChav(p)?`<label class="chav chav-mini"><input type="checkbox" data-trocachav="${k}" ${c?"checked":""}> <span>🔑 Chaveiro</span> <b>+${brl(precoChav())}</b></label>`:""}</div>
       <div class="qtd"><button data-menos="${k}">−</button>${q}<button data-mais="${k}">+</button></div>
     </div>`).join("");
   const sub = itens.reduce((s,i)=>s+i.un*i.q,0);
@@ -698,7 +703,7 @@ function atualizaCarrinho(){
   $("#continuar").onclick = () => abrir(false);
   $("#selRegiao").onchange = e => { regiao=e.target.value; salvar("popzin_regiao",regiao); atualizaCarrinho(); };
   const montaLink = () => {
-    const linhas = itens.map(({p,q,c,un,combo,corNome})=>`• ${q}x ${p.nome}${corNome?` (${corNome})`:""}${c?` + chaveiro (+${brl(precoChav())})`:""}${combo?" (combo)":""} — ${brl(un*q)}`).join("\n");
+    const linhas = itens.map(({p,q,c,un,combo,corNome})=>`• ${q}x ${p.nome}${corNome?` (${corNome})`:""}${p.encomenda?" [sob encomenda]":""}${c?` + chaveiro (+${brl(precoChav())})`:""}${combo?" (combo)":""} — ${brl(un*q)}`).join("\n");
     const obs = $("#obs").value.trim();
     $("#finalizar").href = wa(`Olá, ${CONFIG.loja}! Quero fazer este pedido 🐾\n\n${linhas}\n\nSubtotal: ${brl(sub)}\nFrete (${regiao}): ${gratis?"Grátis":brl(frete)}\nTotal: ${brl(total)}\nTotal no Pix: ${brl(pixDe(sub)+frete)}${obs?`\n\nObs.: ${obs}`:""}`);
   };
@@ -979,11 +984,12 @@ function resumo(){
   const uf = f.uf.value, reg = uf ? regiaoPorUF(uf) : regiao;
   const gratis = sub >= CONFIG.freteGratisAcima, frete = gratis ? 0 : (+CONFIG.fretes[reg] || 0);
   $("#ckResumo").innerHTML = `
-    ${itens.map(i => `<div class="linha"><span>${i.q}× ${escH(i.p.nome)}${i.corNome?` (${escH(i.corNome)})`:""}${i.c?" 🔑":""}</span><span>${brl(i.un*i.q)}</span></div>`).join("")}
+    ${itens.map(i => `<div class="linha"><span>${i.q}× ${escH(i.p.nome)}${i.corNome?` (${escH(i.corNome)})`:""}${i.p.encomenda?" 🛠️":""}${i.c?" 🔑":""}</span><span>${brl(i.un*i.q)}</span></div>`).join("")}
     <div class="linha"><span>Frete ${uf ? `(${escH(reg)})` : "(informe o CEP)"}</span><span>${gratis ? "Grátis" : brl(frete)}</span></div>
     <div class="linha pix"><span>Desconto Pix (${Math.round(CONFIG.descontoPix*100)}% nos produtos)</span><span>− ${brl(sub*CONFIG.descontoPix)}</span></div>
     <div class="linha total"><b>Total no Pix</b><b>${brl(pixDe(sub)+frete)}</b></div>
-    ${temCartao() ? `<div class="linha" style="color:var(--suave)"><span>No cartão (${maxParcelas() > 1 ? `até ${maxParcelas()}x` : "à vista"})</span><span>${brl(sub+frete)}</span></div>` : ""}`;
+    ${temCartao() ? `<div class="linha" style="color:var(--suave)"><span>No cartão (${maxParcelas() > 1 ? `até ${maxParcelas()}x` : "à vista"})</span><span>${brl(sub+frete)}</span></div>` : ""}
+    ${itens.some(i => i.p.encomenda) ? `<div class="enc-info" style="margin-top:8px">🛠️ Seu pedido tem item sob encomenda${(p => p ? `: produção em <b>${escH(p)}</b>` : "")(itens.map(i => i.p.encomenda && prazoDe(i.p)).find(Boolean))}, contados depois da confirmação do pagamento. O pedido é enviado completo.</div>` : ""}`;
 }
 function telaPix(p){
   $("#ckTitulo").textContent = "Pague com Pix";

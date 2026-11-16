@@ -189,7 +189,8 @@ function calcular(itensPedidos, produtos, cfg, uf) {
     const p = produtos.find(x => +x.id === +it.id);
     if (!p) throw erroPublico("Um produto do carrinho não existe mais. Atualize a página.");
     const total = porProduto[+p.id];
-    if (total > (+p.estoque || 0)) throw erroPublico(`Estoque insuficiente de ${p.nome} (disponível: ${+p.estoque || 0}).`);
+    const enc = !!p.encomenda;                                   // sob encomenda: produzido depois do pedido, sem estoque
+    if (!enc && total > (+p.estoque || 0)) throw erroPublico(`Estoque insuficiente de ${p.nome} (disponível: ${+p.estoque || 0}).`);
     const combo = +p.promoQtd >= 2 && +p.promoPreco > 0 && +p.promoPreco < +p.preco && total >= +p.promoQtd;
     const chav = !!it.chaveiro && precoChav > 0 && !p.semChaveiro;
     const un = r2((combo ? +p.promoPreco : +p.preco) + (chav ? precoChav : 0));
@@ -199,13 +200,13 @@ function calcular(itensPedidos, produtos, cfg, uf) {
     if (cores.length) {
       const c = cores.find(x => x.id === String(it.cor || ""));
       if (!c) throw erroPublico(`Escolha a cor de ${p.nome}. Atualize a página.`);
-      const disp = estoqueCor(c);
+      const disp = enc ? Infinity : estoqueCor(c);
       if (disp <= 0) throw erroPublico(`${p.nome} na cor ${c.nome} esgotou. Escolha outra cor.`);
       if (porCor[`${+p.id}@${c.id}`] > disp) throw erroPublico(`Estoque insuficiente de ${p.nome} na cor ${c.nome} (disponível: ${disp}).`);
       cor = String(c.nome).slice(0, 40);
       corId = c.id;
     }
-    itens.push({ id: +p.id, nome: p.nome + (cor ? ` — ${cor}` : ""), q, chaveiro: chav, combo, un, ...(cor ? { cor, corId } : {}) });
+    itens.push({ id: +p.id, nome: p.nome + (cor ? ` — ${cor}` : ""), q, chaveiro: chav, combo, un, ...(cor ? { cor, corId } : {}), ...(enc ? { encomenda: true } : {}) });
   }
   const sub = r2(itens.reduce((s, i) => s + i.un * i.q, 0));
   const regiao = regiaoPorUF(cfg.fretes, uf);
@@ -440,9 +441,9 @@ async function aplicarPagamento(env, ped, pg) {
   for (const [pid, q] of Object.entries(soma)) {
     const p = produtos.find(x => +x.id === +pid); if (!p) continue;
     const { _nome, ...limpo } = p;
-    limpo.estoque = Math.max(0, (+p.estoque || 0) - q);
+    if (!p.encomenda) limpo.estoque = Math.max(0, (+p.estoque || 0) - q);
     limpo.vendidos = (+p.vendidos || 0) + q;
-    if (Array.isArray(p.cores) && somaCor[pid]) limpo.cores = p.cores.map(c => somaCor[pid][c.id] && Number.isFinite(estoqueCor(c)) && !c.esgotado
+    if (!p.encomenda && Array.isArray(p.cores) && somaCor[pid]) limpo.cores = p.cores.map(c => somaCor[pid][c.id] && Number.isFinite(estoqueCor(c)) && !c.esgotado
       ? { ...c, estoque: Math.max(0, (+c.estoque || 0) - somaCor[pid][c.id]) } : c);
     await fs(env, `/produtos/${+pid}`, { method: "PATCH", body: JSON.stringify({ fields: { json: { stringValue: JSON.stringify(limpo) } } }) });
   }

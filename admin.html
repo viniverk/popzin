@@ -304,10 +304,12 @@
       <button type="button" class="btn sec" id="btnAddCor" style="margin-top:8px">+ cor</button>
     </div>
 
+    <label id="pPrazoBox" class="oculto">Prazo de produção deste produto<input id="pPrazo" placeholder="vazio = usa o prazo geral da aba Loja (ex.: 7 a 10 dias úteis)"></label>
     <div class="checks">
       <label><input type="checkbox" id="pNovo"> Novidade</label>
       <label><input type="checkbox" id="pDestaque"> Destaque</label>
       <label><input type="checkbox" id="pChav" checked> Aceita chaveiro</label>
+      <label title="Produzido depois do pedido: não usa estoque e nunca aparece como esgotado"><input type="checkbox" id="pEnc"> 🛠️ Sob encomenda</label>
     </div>
     <div class="rodape-modal">
       <button type="button" class="btn perigo" id="btnExcluir">Excluir</button>
@@ -596,11 +598,11 @@ function renderTabela(){
   $("#tabela").innerHTML = lista.length ? lista.map(p => `
     <tr>
       <td>${p.foto ? `<img class="thumb" src="${esc(p.foto)}?v=${p.atualizado||""}" alt="">` : `<div class="thumb" style="background:${esc(p.cor||'#f5eee9')}">${esc(p.emoji||"🐾")}</div>`}</td>
-      <td><b>${esc(p.nome)}</b><small class="tipo-mob" style="display:none;color:var(--suave)">${(t => t ? `${esc(t.emoji||"")} ${esc(t.nome)}` : esc(p.tipo||""))(tiposLoja().find(t => t.id === p.tipo))}</small><br>${p.novo?'<span class="pill">NOVO</span>':''}${p.destaque?'<span class="pill" style="background:var(--cor)">DESTAQUE</span>':''}${!+p.estoque?'<span class="pill esg">ESGOTADO</span>':''}</td>
+      <td><b>${esc(p.nome)}</b><small class="tipo-mob" style="display:none;color:var(--suave)">${(t => t ? `${esc(t.emoji||"")} ${esc(t.nome)}` : esc(p.tipo||""))(tiposLoja().find(t => t.id === p.tipo))}</small><br>${p.novo?'<span class="pill">NOVO</span>':''}${p.destaque?'<span class="pill" style="background:var(--cor)">DESTAQUE</span>':''}${p.encomenda?'<span class="pill" style="background:#ff8a00">SOB ENCOMENDA</span>':!+p.estoque?'<span class="pill esg">ESGOTADO</span>':''}</td>
       <td class="col-tipo">${(t => t ? `${esc(t.emoji||"")} ${esc(t.nome)}` : esc(p.tipo||"—"))(tiposLoja().find(t => t.id === p.tipo))}</td>
       <td class="col-colecao">${esc(p.colecao||"")}</td>
       <td>${brl(p.preco)}${+p.de?`<br><s style="color:var(--suave);font-size:.8rem">${brl(p.de)}</s>`:""}</td>
-      <td class="col-estoque">${+p.estoque||0}${(p.cores||[]).length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${p.cores.map(c => `<span title="${esc(c.nome)}" style="display:inline-flex;align-items:center;gap:3px;font-size:.72rem;color:${(c.esgotado||+c.estoque===0)?"#c62828":"var(--suave)"}"><i style="width:10px;height:10px;border-radius:50%;background:${esc(c.hex||"#ccc")};display:inline-block;box-shadow:0 0 0 1px #ddd"></i>${c.esgotado ? 0 : (c.estoque ?? "?")}</span>`).join("")}</div>` : ""}</td>
+      <td class="col-estoque">${p.encomenda ? `<span style="color:#b35c00;font-weight:700">🛠️ Encomenda</span>` : +p.estoque||0}${!p.encomenda && (p.cores||[]).length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${p.cores.map(c => `<span title="${esc(c.nome)}" style="display:inline-flex;align-items:center;gap:3px;font-size:.72rem;color:${(c.esgotado||+c.estoque===0)?"#c62828":"var(--suave)"}"><i style="width:10px;height:10px;border-radius:50%;background:${esc(c.hex||"#ccc")};display:inline-block;box-shadow:0 0 0 1px #ddd"></i>${c.esgotado ? 0 : (c.estoque ?? "?")}</span>`).join("")}</div>` : ""}</td>
       <td><div class="acoes"><button class="btn sec" data-editar="${p.id}">Editar</button></div></td>
     </tr>`).join("") : `<tr><td colspan="7" style="text-align:center;color:var(--suave);padding:30px">Nenhum produto ainda. Clique em “+ Novo produto”.</td></tr>`;
 
@@ -617,6 +619,7 @@ function abrirModal(p){
   $("#pPreco").value = p?.preco ?? ""; $("#pDe").value = p?.de || ""; $("#pEstoque").value = p?.estoque ?? 0;
   $("#pVendidos").value = p?.vendidos ?? 0; $("#pPromoQtd").value = p?.promoQtd || ""; $("#pPromoPreco").value = p?.promoPreco || ""; $("#pEmoji").value = p?.emoji || ""; $("#pCor").value = p?.cor || "#f1ebff";
   $("#pChav").checked = !p?.semChaveiro; $("#pNovo").checked = !!p?.novo; $("#pDestaque").checked = !!p?.destaque; $("#pFoto").value = ""; $("#pFotoUrl").value = p?.foto || "";
+  $("#pEnc").checked = !!p?.encomenda; $("#pPrazo").value = p?.prazo || ""; modoEncomenda();
   montarCores(p);
   $("#pFotosExtras").innerHTML = ""; (p?.fotos || []).forEach(u => linhaFotoExtra(u));
   atualizaPreview();
@@ -650,6 +653,16 @@ function linhaFotoExtra(url = ""){
 }
 $("#btnAddFoto").onclick = () => { linhaFotoExtra(); document.querySelector("#pFotosExtras > div:last-child input")?.focus(); };
 
+/* sob encomenda: estoque não se aplica */
+function modoEncomenda(){
+  const on = $("#pEnc").checked;
+  $("#pPrazoBox").classList.toggle("oculto", !on);
+  $("#pEstoque").closest("label").style.opacity = on ? ".45" : "";
+  $("#pEstoque").title = on ? "Sob encomenda: o estoque não é usado" : "";
+  document.querySelectorAll("#pCores .c-est").forEach(i => { i.disabled = on; i.placeholder = on ? "—" : "Estoque"; });
+}
+$("#pEnc").onchange = modoEncomenda;
+
 function montarCores(p){ $("#pCores").innerHTML = ""; (p?.cores || []).forEach(linhaCor); somaEstoqueCores(); }
 /* com cores, o estoque do produto é a soma das cores (campo fica travado) */
 function somaEstoqueCores(){
@@ -666,13 +679,13 @@ function lerCores(){
     if(!nome) return {erro: "Toda cor precisa de um nome."};
     let id = d.dataset.id || slug(nome), base = id, k = 2; while(usados.has(id)) id = `${base}-${k++}`; usados.add(id);
     const est = d.querySelector(".c-est").value;
-    if(est === "") return {erro: `Informe o estoque da cor ${nome} (pode ser 0).`};
+    if(est === "" && !$("#pEnc").checked) return {erro: `Informe o estoque da cor ${nome} (pode ser 0).`};
     const foto2 = d.querySelector(".c-foto2").value.trim();
     out.push({id, nome, hex: d.querySelector(".c-hex").value, foto: foto ? normalizarFoto(foto) : "", ...(foto2 ? {fotos:[normalizarFoto(foto2)]} : {}), estoque: Math.max(0, Math.floor(+est || 0))});
   }
   return out;
 }
-$("#btnAddCor").onclick = () => { linhaCor(); somaEstoqueCores(); document.querySelector("#pCores .linha-cor:last-child .c-nome")?.focus(); };
+$("#btnAddCor").onclick = () => { linhaCor(); somaEstoqueCores(); modoEncomenda(); document.querySelector("#pCores .linha-cor:last-child .c-nome")?.focus(); };
 document.body.insertAdjacentHTML("beforeend", `<datalist id="sugCores">${Object.keys(CORES_SUGERIDAS).map(n => `<option value="${n[0].toUpperCase()+n.slice(1)}">`).join("")}</datalist>`);
 
 function fecharModal(){ $("#modal").classList.add("oculto"); }
@@ -721,6 +734,7 @@ $("#formProduto").onsubmit = async e => {
       id, nome:$("#pNome").value.trim(), tipo:$("#pTipo").value, colecao:colecaoEscolhida(),
       preco:+$("#pPreco").value||0, de:+$("#pDe").value||0, estoque:+$("#pEstoque").value||0, vendidos:+$("#pVendidos").value||0, promoQtd:Math.floor(+$("#pPromoQtd").value||0), promoPreco:+$("#pPromoPreco").value||0,
       emoji:$("#pEmoji").value.trim(), cor:$("#pCor").value, novo:$("#pNovo").checked, destaque:$("#pDestaque").checked, semChaveiro:!$("#pChav").checked,
+      encomenda:$("#pEnc").checked, prazo:$("#pEnc").checked ? $("#pPrazo").value.trim() : "",
       foto: editando?.foto || "", atualizado: Date.now()
     };
     const cores = lerCores();
@@ -968,7 +982,7 @@ $("#vPedidos").onchange = async e => {
       for(const it of (ped.itens||[])){
         const prod = atual.find(x => x.id == it.id); if(!prod) continue;
         prod.vendidos = Math.max(0, (+prod.vendidos||0) + sinal*(+it.q||0));
-        if(ped.origem === "site"){
+        if(ped.origem === "site" && !prod.encomenda){
           prod.estoque = Math.max(0, (+prod.estoque||0) - sinal*(+it.q||0));
           const c = (prod.cores||[]).find(c => (it.corId && c.id === it.corId) || (!it.corId && it.cor && c.nome === it.cor));
           if(c && c.estoque !== undefined && c.estoque !== "") c.estoque = Math.max(0, (+c.estoque||0) - sinal*(+it.q||0));
