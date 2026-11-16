@@ -95,6 +95,7 @@
     .col-colecao,.col-estoque,.col-tipo{display:none}
     .linha-cor{grid-template-columns:46px 1fr auto 40px!important}
     .linha-cor .c-foto{grid-column:1/-1;order:5}
+    .linha-cor .c-foto2{grid-column:1/-1!important;order:6}
     .tipo-mob{display:block!important}
   }
 </style>
@@ -255,7 +256,12 @@
           <div class="ajuda">A imagem é redimensionada (máx. 1000px) e comprimida antes de subir.</div>
         </div>
         <div id="fotoLink" class="oculto" style="display:grid;gap:8px">
-          <label>Link da foto<input id="pFotoUrl" type="url" placeholder="https://i.imgur.com/abc123.jpg"></label>
+          <label>Link da foto principal (frente)<input id="pFotoUrl" type="url" placeholder="https://i.imgur.com/abc123.jpg"></label>
+          <div>
+            <label style="margin-bottom:4px">Mais fotos (traseira, lateral, detalhes…)</label>
+            <div id="pFotosExtras" style="display:grid;gap:6px"></div>
+            <button type="button" class="btn sec" id="btnAddFoto" style="margin-top:6px">+ foto</button>
+          </div>
           <div class="ajuda">Envie a foto em <a href="https://imgur.com/upload" target="_blank" rel="noopener">imgur.com/upload</a>, clique com o botão direito na imagem → <b>Copiar endereço da imagem</b> e cole aqui. Link de página do Imgur também serve.</div>
         </div>
         <button type="button" class="btn sec" id="btnTirarFoto">Remover foto</button>
@@ -612,6 +618,7 @@ function abrirModal(p){
   $("#pVendidos").value = p?.vendidos ?? 0; $("#pPromoQtd").value = p?.promoQtd || ""; $("#pPromoPreco").value = p?.promoPreco || ""; $("#pEmoji").value = p?.emoji || ""; $("#pCor").value = p?.cor || "#f1ebff";
   $("#pChav").checked = !p?.semChaveiro; $("#pNovo").checked = !!p?.novo; $("#pDestaque").checked = !!p?.destaque; $("#pFoto").value = ""; $("#pFotoUrl").value = p?.foto || "";
   montarCores(p);
+  $("#pFotosExtras").innerHTML = ""; (p?.fotos || []).forEach(u => linhaFotoExtra(u));
   atualizaPreview();
   $("#modal").classList.remove("oculto");
 }
@@ -622,14 +629,27 @@ function linhaCor(c = {}){
   d.dataset.id = c.id || "";
   d.innerHTML = `<input type="color" class="c-hex" value="${esc(c.hex || "#8e24aa")}" style="height:40px;padding:3px" aria-label="Cor">
     <input class="c-nome" placeholder="Nome (ex.: Laranja)" value="${esc(c.nome || "")}" list="sugCores">
-    <input class="c-foto" type="url" placeholder="Link da foto nessa cor (Imgur)" value="${esc(c.foto || "")}">
+    <input class="c-foto" type="url" placeholder="Foto nessa cor (frente)" value="${esc(c.foto || "")}">
     <input class="c-est" type="number" min="0" step="1" placeholder="Estoque" title="Estoque desta cor" aria-label="Estoque desta cor" value="${c.esgotado ? 0 : (c.estoque ?? "")}" style="width:84px">
-    <button type="button" class="btn sec" title="Remover cor">✕</button>`;
+    <button type="button" class="btn sec" title="Remover cor">✕</button>
+    <input class="c-foto2" type="url" placeholder="2ª foto nessa cor (traseira) — opcional" value="${esc((c.fotos||[])[0] || "")}" style="grid-column:2/-1">`;
   d.querySelector("button").onclick = () => { d.remove(); somaEstoqueCores(); };
   d.querySelector(".c-est").addEventListener("input", somaEstoqueCores);
   d.querySelector(".c-nome").addEventListener("change", e => { const h = CORES_SUGERIDAS[e.target.value.trim().toLowerCase()]; if(h && !c.hex) d.querySelector(".c-hex").value = h; });
   $("#pCores").appendChild(d);
 }
+/* fotos extras do produto (só com Firebase, por link) */
+function linhaFotoExtra(url = ""){
+  const d = document.createElement("div"); d.className = "fretes-linha"; d.style.gridTemplateColumns = "48px 1fr 40px";
+  d.innerHTML = `<div class="mini-prev" style="width:48px;height:48px;border-radius:10px;background:#f3effc center/cover no-repeat"></div><input type="url" placeholder="https://i.imgur.com/… (traseira)" value="${esc(url)}"><button type="button" class="btn sec" title="Remover foto">✕</button>`;
+  const inp = d.querySelector("input"), pv = d.querySelector(".mini-prev");
+  const atual = () => { const u = normalizarFoto(inp.value); pv.style.backgroundImage = u ? `url("${u.replace(/"/g,"")}")` : ""; };
+  inp.oninput = atual; atual();
+  d.querySelector("button").onclick = () => d.remove();
+  $("#pFotosExtras").appendChild(d);
+}
+$("#btnAddFoto").onclick = () => { linhaFotoExtra(); document.querySelector("#pFotosExtras > div:last-child input")?.focus(); };
+
 function montarCores(p){ $("#pCores").innerHTML = ""; (p?.cores || []).forEach(linhaCor); somaEstoqueCores(); }
 /* com cores, o estoque do produto é a soma das cores (campo fica travado) */
 function somaEstoqueCores(){
@@ -647,7 +667,8 @@ function lerCores(){
     let id = d.dataset.id || slug(nome), base = id, k = 2; while(usados.has(id)) id = `${base}-${k++}`; usados.add(id);
     const est = d.querySelector(".c-est").value;
     if(est === "") return {erro: `Informe o estoque da cor ${nome} (pode ser 0).`};
-    out.push({id, nome, hex: d.querySelector(".c-hex").value, foto: foto ? normalizarFoto(foto) : "", estoque: Math.max(0, Math.floor(+est || 0))});
+    const foto2 = d.querySelector(".c-foto2").value.trim();
+    out.push({id, nome, hex: d.querySelector(".c-hex").value, foto: foto ? normalizarFoto(foto) : "", ...(foto2 ? {fotos:[normalizarFoto(foto2)]} : {}), estoque: Math.max(0, Math.floor(+est || 0))});
   }
   return out;
 }
@@ -704,6 +725,8 @@ $("#formProduto").onsubmit = async e => {
     };
     const cores = lerCores();
     if(cores.erro) throw new Error(cores.erro);
+    const extras = [...document.querySelectorAll("#pFotosExtras input")].map(i => normalizarFoto(i.value)).filter(Boolean);
+    if(modoFB){ if(extras.length) p.fotos = extras; else delete p.fotos; } else if(editando?.fotos) p.fotos = editando.fotos;
     if(cores.length){ p.cores = cores; p.estoque = cores.reduce((s,c) => s + c.estoque, 0); } else delete p.cores;
     const fotoAntiga = editando?.foto || "";
     if(modoFB){ p.foto = normalizarFoto($("#pFotoUrl").value); }

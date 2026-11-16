@@ -106,6 +106,13 @@
   .card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(123,47,247,.15)}
   .foto{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:4.5rem}
   .foto img{width:100%;height:100%;object-fit:cover}
+  .gal-seta{position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:30px;height:30px;border-radius:50%;border:0;background:rgba(255,255,255,.88);color:#2a1f4a;font-size:1.3rem;line-height:1;font-weight:800;box-shadow:0 2px 8px rgba(0,0,0,.18);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0 0 3px;opacity:0;transition:opacity .2s}
+  .gal-ant{left:8px}.gal-prox{right:8px}
+  .card:hover .gal-seta,.card:focus-within .gal-seta{opacity:1}
+  @media (hover:none){.gal-seta{opacity:.9;width:26px;height:26px;font-size:1.1rem}}
+  .gal-pontos{position:absolute;bottom:40px;left:0;right:0;display:flex;justify-content:center;gap:5px;z-index:2;pointer-events:none}
+  .gal-pontos i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.6);box-shadow:0 0 0 1px rgba(0,0,0,.15)}
+  .gal-pontos i.on{background:#fff;width:16px;border-radius:4px}
   .fav{position:absolute;top:8px;right:8px;background:#fff;border-radius:50%;width:36px;height:36px;font-size:1.1rem;box-shadow:0 2px 6px rgba(0,0,0,.1)}
   .selo{position:absolute;top:8px;left:8px;background:var(--cor);color:#fff;font-size:.72rem;font-weight:800;border-radius:8px;padding:3px 8px}
   .selo.novo{background:var(--cor2)}
@@ -564,6 +571,16 @@ const semCor = c => estoqueCor(c) <= 0;
 const qtdDaCor = (id, cor) => Object.entries(carrinho).reduce((s,[k,q]) => { const l = lerChave(k); return s + (l.id === id && l.cor === cor ? q : 0); }, 0);
 const podeMais = (p, cor) => qtdNoCarrinho(p.id) < p.estoque && (!cor || qtdDaCor(p.id, cor) < estoqueCor(corDe(p, cor)));
 const fotoDe = (p, corId) => corDe(p, corId)?.foto || p.foto || "";
+/* galeria: foto principal (ou da cor) + fotos extras (frente, traseira…). A cor pode ter as próprias extras. */
+const galeriaDe = (p, corId) => { const c = corDe(p, corId), extras = (c && Array.isArray(c.fotos) && c.fotos.length) ? c.fotos : (Array.isArray(p.fotos) ? p.fotos : []);
+  return [...new Set([fotoDe(p, corId), ...extras].filter(Boolean))]; };
+const pontosGal = n => n > 1 ? `<button type="button" class="gal-seta gal-ant" data-gal="-1" aria-label="Foto anterior">‹</button><button type="button" class="gal-seta gal-prox" data-gal="1" aria-label="Próxima foto">›</button><div class="gal-pontos">${Array.from({length:n},(_,i)=>`<i class="${i?"":"on"}"></i>`).join("")}</div>` : "";
+function mostrarFotoGal(cardEl, p, i){
+  const g = galeriaDe(p, corInicial(p)); if(!g.length) return;
+  i = (i + g.length) % g.length; cardEl.dataset.gi = i;
+  const img = cardEl.querySelector("[data-foto-de]"); if(img){ img.dataset.orig = g[i]; img.src = mini(g[i]); }
+  cardEl.querySelectorAll(".gal-pontos i").forEach((d,k) => d.classList.toggle("on", k === i));
+}
 const corSel = {};                                                  // cor escolhida em cada card
 const corInicial = p => { const cs = coresDe(p); if(!cs.length) return ""; if(corSel[p.id] && cs.some(c => c.id === corSel[p.id] && !semCor(c))) return corSel[p.id]; return (cs.find(c => !semCor(c)) || cs[0]).id; };
 const qtdNoCarrinho = id => Object.entries(carrinho).reduce((s,[k,q]) => s + (lerChave(k).id===id ? q : 0), 0);
@@ -576,10 +593,11 @@ function card(p){
   const cs = coresDe(p), cAtual = corInicial(p), foto = fotoDe(p, cAtual);
   const esg = !p.estoque;
   const selo = esg ? `<span class="selo esgot">ESGOTADO</span>` : off ? `<span class="selo">-${off}%</span>` : p.novo ? `<span class="selo novo">NOVO</span>` : "";
-  return `<div class="card">
+  return `<div class="card" data-pid="${p.id}">
     <div class="foto" style="background:${p.cor||'#f5eee9'}">
       ${foto ? `<img src="${mini(foto)}" alt="${p.nome}" loading="lazy" data-foto-de="${p.id}" onerror="if(this.dataset.orig&&this.src!==this.dataset.orig)this.src=this.dataset.orig" data-orig="${foto}">` : (p.emoji||'🐾')}
       ${selo}
+      ${pontosGal(galeriaDe(p, cAtual).length)}
       <button class="fav" data-fav="${p.id}" title="Favoritar">${favs.includes(p.id)?"❤️":"🤍"}</button>
       ${+p.vendidos > 0 ? `<span class="vendidos">🔥 ${(+p.vendidos).toLocaleString("pt-BR")} vendido${+p.vendidos>1?"s":""}</span>` : ""}
     </div>
@@ -600,14 +618,27 @@ function card(p){
   </div>`;
 }
 
+/* deslizar o dedo na foto troca a imagem da galeria */
+let toqueX = null;
+$("#grade").addEventListener("touchstart", e => { toqueX = e.target.closest(".foto") ? e.touches[0].clientX : null; }, {passive:true});
+$("#grade").addEventListener("touchend", e => {
+  if(toqueX === null) return; const dx = e.changedTouches[0].clientX - toqueX; toqueX = null;
+  if(Math.abs(dx) < 40) return; const cardEl = e.target.closest(".card"); if(!cardEl?.querySelector(".gal-pontos")) return;
+  const p = PRODUTOS.find(x => x.id === +cardEl.dataset.pid); if(p) mostrarFotoGal(cardEl, p, (+cardEl.dataset.gi || 0) + (dx < 0 ? 1 : -1));
+}, {passive:true});
 $("#grade").onclick = e => {
+  const gs = e.target.closest("[data-gal]");
+  if(gs){ const cardEl = gs.closest(".card"), p = PRODUTOS.find(x => x.id === +cardEl.dataset.pid);
+    if(p) mostrarFotoGal(cardEl, p, (+cardEl.dataset.gi || 0) + (+gs.dataset.gal)); return; }
   const sw = e.target.closest("[data-cor]");
   if(sw){ const [pid, cid] = sw.dataset.cor.split(":"), p = PRODUTOS.find(x => x.id === +pid), c = corDe(p, cid); if(!c || semCor(c)) return;
     corSel[p.id] = cid; const cardEl = sw.closest(".card");
     cardEl.querySelectorAll(".cor-bola").forEach(b => b.classList.toggle("on", b === sw));
     cardEl.querySelector(`[data-cor-nome="${p.id}"]`).textContent = c.nome;
-    const img = cardEl.querySelector("[data-foto-de]"), f2 = fotoDe(p, cid);
-    if(img && f2){ img.dataset.orig = f2; img.src = mini(f2); }
+    const fotoBox = cardEl.querySelector(".foto"), n = galeriaDe(p, cid).length;
+    fotoBox.querySelectorAll(".gal-seta,.gal-pontos").forEach(x => x.remove());
+    fotoBox.querySelector(".fav").insertAdjacentHTML("beforebegin", pontosGal(n));
+    mostrarFotoGal(cardEl, p, 0);
     return; }
   const f = e.target.closest("[data-fav]"), a = e.target.closest("[data-add]");
   if(f){ const id=+f.dataset.fav; favs = favs.includes(id) ? favs.filter(x=>x!==id) : [...favs,id]; salvar("popzin_favs",favs); render(); }
