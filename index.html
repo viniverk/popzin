@@ -566,7 +566,9 @@ function render(){
     novos:(a,b)=>(b.novo?1:0)-(a.novo?1:0) || b.id-a.id,
     nome:(a,b)=>a.nome.localeCompare(b.nome,"pt-BR"),
   }[estado.ordem];
-  lista.sort((a,b)=>(a.estoque?0:1)-(b.estoque?0:1) || ord(a,b));
+  // 1º lançamentos/campanha; depois disponíveis antes dos esgotados (sob encomenda conta como disponível); depois a ordem escolhida
+  const disp = p => p.encomenda || p.estoque > 0 ? 0 : 1;
+  lista.sort((a,b)=>(b.novo?1:0)-(a.novo?1:0) || disp(a)-disp(b) || ord(a,b));
 
   $("#contagem").textContent = estado.soFavs ? `🤍 Seus favoritos: ${lista.length}` : `${lista.length} bichinho(s)`;
   $("#grade").innerHTML = lista.length ? lista.map(card).join("") :
