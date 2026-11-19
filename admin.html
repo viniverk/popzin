@@ -51,6 +51,10 @@
   td .acoes{display:flex;gap:6px}
   td .acoes button{padding:6px 10px;font-size:.82rem}
   .pill{font-size:.7rem;font-weight:800;border-radius:6px;padding:2px 6px;color:#fff;background:var(--cor2);margin-right:3px}
+  .col-lanc{text-align:center}
+  .lanc-chk{display:inline-flex;align-items:center;gap:4px;cursor:pointer;margin:0;font-weight:700}
+  .lanc-chk input{width:20px;height:20px;accent-color:#3b0f8c;cursor:pointer}
+  .lanc-chk input:not(:checked)+span{filter:grayscale(1);opacity:.35}
   .pill.esg{background:#9a8f8a}
 
   .modal-veu{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:flex-start;justify-content:center;padding:4vh 12px;overflow:auto;z-index:30}
@@ -93,6 +97,8 @@
   @media(max-width:640px){
     .foto-area{grid-template-columns:1fr}
     .col-colecao,.col-estoque,.col-tipo{display:none}
+    .so-pc,.lanc-chk span{display:none}
+    #tabela td,#tabela th,table th{padding-left:6px;padding-right:6px}
     .linha-cor{grid-template-columns:46px 1fr auto 40px!important}
     .linha-cor .c-foto{grid-column:1/-1;order:5}
     .linha-cor .c-foto2{grid-column:1/-1!important;order:6}
@@ -160,7 +166,7 @@
       <div class="ajuda" id="avisoTempo" style="margin-bottom:10px">Depois de salvar, o site leva cerca de 1 minuto para atualizar no GitHub Pages.</div>
       <div id="importar" class="cartao oculto" style="margin-bottom:14px;max-width:none"></div>
       <table>
-        <thead><tr><th></th><th>Produto</th><th class="col-tipo">Tipo</th><th class="col-colecao">Coleção</th><th>Preço</th><th class="col-estoque">Estoque</th><th></th></tr></thead>
+        <thead><tr><th></th><th>Produto</th><th class="col-tipo">Tipo</th><th class="col-colecao">Coleção</th><th>Preço</th><th class="col-estoque">Estoque</th><th class="col-lanc" title="Marque para o produto aparecer no botão Lançamentos da loja">🚀<span class="so-pc"> Lançamento</span></th><th></th></tr></thead>
         <tbody id="tabela"></tbody>
       </table>
     </section>
@@ -570,7 +576,7 @@ $("#btnSair").onclick = async () => {
 async function entrarNoPainel(){
   mostrar("#telaPainel");
   if(modoFB) iniciarVigia();
-  $("#tabela").innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--suave);padding:30px">Carregando...</td></tr>`;
+  $("#tabela").innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--suave);padding:30px">Carregando...</td></tr>`;
   try{
     produtos = await BD.lerProdutos();
     loja = (await BD.lerLoja()) || {...PADRAO_LOJA};
@@ -604,11 +610,25 @@ function renderTabela(){
       <td class="col-colecao">${esc(p.colecao||"")}</td>
       <td>${brl(p.preco)}${+p.de?`<br><s style="color:var(--suave);font-size:.8rem">${brl(p.de)}</s>`:""}</td>
       <td class="col-estoque">${p.encomenda ? `<span style="color:#b35c00;font-weight:700">🛠️ Encomenda</span>` : +p.estoque||0}${!p.encomenda && (p.cores||[]).length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${p.cores.map(c => `<span title="${esc(c.nome)}" style="display:inline-flex;align-items:center;gap:3px;font-size:.72rem;color:${(c.esgotado||+c.estoque===0)?"#c62828":"var(--suave)"}"><i style="width:10px;height:10px;border-radius:50%;background:${esc(c.hex||"#ccc")};display:inline-block;box-shadow:0 0 0 1px #ddd"></i>${c.esgotado ? 0 : (c.estoque ?? "?")}</span>`).join("")}</div>` : ""}</td>
+      <td class="col-lanc"><label class="lanc-chk" title="Aparece no botão Lançamentos da loja"><input type="checkbox" data-lanc="${p.id}" ${p.novo ? "checked" : ""} aria-label="Lançamento: ${esc(p.nome)}"><span>🚀</span></label></td>
       <td><div class="acoes"><button class="btn sec" data-editar="${p.id}">Editar</button></div></td>
-    </tr>`).join("") : `<tr><td colspan="7" style="text-align:center;color:var(--suave);padding:30px">Nenhum produto ainda. Clique em “+ Novo produto”.</td></tr>`;
+    </tr>`).join("") : `<tr><td colspan="8" style="text-align:center;color:var(--suave);padding:30px">Nenhum produto ainda. Clique em “+ Novo produto”.</td></tr>`;
 
 }
 $("#filtro").oninput = renderTabela;
+/* marcar/desmarcar lançamento direto na lista (salva na hora) */
+$("#tabela").addEventListener("change", async e => {
+  const cb = e.target.closest("[data-lanc]"); if(!cb) return;
+  const p = produtos.find(x => x.id == cb.dataset.lanc); if(!p) return;
+  cb.disabled = true;
+  try{
+    const novo = {...p, novo: cb.checked, atualizado: Date.now()};
+    await BD.salvarProduto(novo);
+    Object.assign(p, novo);
+    renderTabela();
+    toast(cb.checked ? `🚀 ${p.nome} agora está em Lançamentos` : `${p.nome} saiu de Lançamentos`);
+  }catch(err){ cb.checked = !cb.checked; cb.disabled = false; toast(err.message, true); }
+});
 $("#tabela").onclick = e => { const b = e.target.closest("[data-editar]"); if(b) abrirModal(produtos.find(p=>p.id==b.dataset.editar)); };
 $("#btnNovo").onclick = () => abrirModal(null);
 
