@@ -530,7 +530,7 @@ function montarFiltros(){
   const cont = t => PRODUTOS.filter(p => noTipo(p, t)).length;
   const nLanc = cont("lancamentos");
   const tipos = Object.entries(TIPOS).filter(([k]) => k==="todos" || cont(k) > 0);
-  if(nLanc) tipos.splice(1, 0, ["lancamentos", "🚀 Lançamentos"]);           // logo depois de "Todos"
+  if(nLanc) tipos.splice(1, 0, ["lancamentos", escH(String(CONFIG.lancNome || "").trim() || "🚀 Lançamentos")]);           // logo depois de "Todos"
   if(!tipos.some(([k]) => k===estado.tipo)) estado.tipo = "todos";
   $("#abas").innerHTML = tipos.length > 1 ? tipos.map(([k,v]) => k === "lancamentos"
     ? `<button class="aba aba-lanc" data-tipo="lancamentos"><span>${v}</span> <small>${nLanc}</small></button>`
@@ -612,7 +612,7 @@ function card(p){
   const off = p.de ? Math.round((1-p.preco/p.de)*100) : 0;
   const cs = coresDe(p), cAtual = corInicial(p), foto = fotoDe(p, cAtual);
   const esg = !p.encomenda && !p.estoque;
-  const selo = esg ? `<span class="selo esgot">ESGOTADO</span>` : p.novo ? `<span class="selo novo">🚀 LANÇAMENTO</span>` : p.encomenda ? `<span class="selo enc">SOB ENCOMENDA</span>` : off ? `<span class="selo">-${off}%</span>` : "";
+  const selo = esg ? `<span class="selo esgot">ESGOTADO</span>` : p.novo ? `<span class="selo novo">${escH(String(CONFIG.lancSelo || "").trim() || "🚀 LANÇAMENTO")}</span>` : p.encomenda ? `<span class="selo enc">SOB ENCOMENDA</span>` : off ? `<span class="selo">-${off}%</span>` : "";
   return `<div class="card" data-pid="${p.id}">
     <div class="foto" style="background:${p.cor||'#f5eee9'}">
       ${foto ? `<img src="${mini(foto)}" alt="${p.nome}" loading="lazy" data-foto-de="${p.id}" onerror="if(this.dataset.orig&&this.src!==this.dataset.orig)this.src=this.dataset.orig" data-orig="${foto}">` : (p.emoji||'🐾')}
