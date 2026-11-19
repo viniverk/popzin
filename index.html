@@ -74,6 +74,14 @@
   .controles{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:22px 0 14px}
   .abas{display:flex;gap:6px;flex-wrap:wrap}
   .aba{background:#fff;border:1px solid var(--borda);border-radius:999px;padding:8px 16px;font-weight:700;color:var(--texto)}
+  .aba-lanc{position:relative;overflow:hidden;color:#fff!important;border:0!important;background:linear-gradient(135deg,#1a0b3d 0%,#3b0f8c 55%,#7b2ff7 100%)!important;
+    box-shadow:0 0 0 2px #ffcf3d inset,0 6px 18px rgba(91,33,182,.45);animation:lancPulso 1.8s ease-in-out infinite;letter-spacing:.01em}
+  .aba-lanc small{background:#ffcf3d!important;color:#1a0b3d!important;opacity:1!important;border-radius:999px;padding:1px 7px;font-weight:800;margin-left:2px}
+  .aba-lanc::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.45),transparent);transform:skewX(-20deg);animation:lancBrilho 2.6s ease-in-out infinite}
+  .aba-lanc.ativa{box-shadow:0 0 0 3px #ffcf3d,0 8px 22px rgba(91,33,182,.6)}
+  @keyframes lancPulso{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+  @keyframes lancBrilho{0%{left:-60%}55%,100%{left:130%}}
+  @media (prefers-reduced-motion:reduce){.aba-lanc,.aba-lanc::after{animation:none}}
   .aba.ativa{background:var(--cor);border-color:var(--cor);color:#fff}
   .aba small{opacity:.6;font-weight:700;margin-left:2px}
   .atalhos{scrollbar-width:none}.atalhos::-webkit-scrollbar{display:none}
@@ -118,6 +126,7 @@
   .selo.novo{background:var(--cor2)}
   .selo.esgot{background:#9a8f8a}
   .selo.enc{background:#ff8a00}
+  .selo.novo{background:linear-gradient(135deg,#1a0b3d,#7b2ff7);box-shadow:0 0 0 2px #ffcf3d}
   .enc-info{font-size:.78rem;color:#8a4b00;background:#fff3e0;border-radius:10px;padding:6px 8px;margin:6px 0 2px;line-height:1.3}
   .cores{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 2px}
   .cor-bola{width:22px;height:22px;border-radius:50%;background:var(--c);border:2px solid #fff;box-shadow:0 0 0 1px var(--borda);padding:0;cursor:pointer;position:relative}
@@ -514,13 +523,19 @@ montarFiltros();
 
 /* abas e coleções */
 /* só mostra abas/coleções que têm produto, com a contagem */
+/* "Lançamentos" é uma aba especial: produtos marcados como lançamento no painel */
+const noTipo = (p, t) => t === "todos" || (t === "lancamentos" ? !!p.novo : p.tipo === t);
 function montarFiltros(){
   carregarTipos();
-  const cont = t => PRODUTOS.filter(p => t==="todos" || p.tipo===t).length;
+  const cont = t => PRODUTOS.filter(p => noTipo(p, t)).length;
+  const nLanc = cont("lancamentos");
   const tipos = Object.entries(TIPOS).filter(([k]) => k==="todos" || cont(k) > 0);
+  if(nLanc) tipos.splice(1, 0, ["lancamentos", "🚀 Lançamentos"]);           // logo depois de "Todos"
   if(!tipos.some(([k]) => k===estado.tipo)) estado.tipo = "todos";
-  $("#abas").innerHTML = tipos.length > 1 ? tipos.map(([k,v]) => `<button class="aba" data-tipo="${k}">${v} <small>${cont(k)}</small></button>`).join("") : "";
-  const base = PRODUTOS.filter(p => estado.tipo==="todos" || p.tipo===estado.tipo);
+  $("#abas").innerHTML = tipos.length > 1 ? tipos.map(([k,v]) => k === "lancamentos"
+    ? `<button class="aba aba-lanc" data-tipo="lancamentos"><span>${v}</span> <small>${nLanc}</small></button>`
+    : `<button class="aba" data-tipo="${k}">${v} <small>${cont(k)}</small></button>`).join("") : "";
+  const base = PRODUTOS.filter(p => noTipo(p, estado.tipo));
   const cols = [...new Set(base.map(p=>p.colecao).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
   if(estado.colecao && !cols.includes(estado.colecao)) estado.colecao = "";
   $("#selColecao").innerHTML = `<option value="">📚 Todas as coleções</option>` +
@@ -540,7 +555,7 @@ function render(){
   document.querySelectorAll(".aba").forEach(b=>b.classList.toggle("ativa", !estado.soFavs && b.dataset.tipo===estado.tipo));
   let lista = PRODUTOS.filter(p =>
     (estado.soFavs ? favs.includes(p.id) : true) &&
-    (estado.tipo==="todos" || p.tipo===estado.tipo) &&
+    noTipo(p, estado.tipo) &&
     (!estado.colecao || p.colecao===estado.colecao) &&
     (!estado.busca || p.nome.toLowerCase().includes(estado.busca)));
   const ord = {
@@ -597,7 +612,7 @@ function card(p){
   const off = p.de ? Math.round((1-p.preco/p.de)*100) : 0;
   const cs = coresDe(p), cAtual = corInicial(p), foto = fotoDe(p, cAtual);
   const esg = !p.encomenda && !p.estoque;
-  const selo = esg ? `<span class="selo esgot">ESGOTADO</span>` : p.encomenda ? `<span class="selo enc">SOB ENCOMENDA</span>` : off ? `<span class="selo">-${off}%</span>` : p.novo ? `<span class="selo novo">NOVO</span>` : "";
+  const selo = esg ? `<span class="selo esgot">ESGOTADO</span>` : p.novo ? `<span class="selo novo">🚀 LANÇAMENTO</span>` : p.encomenda ? `<span class="selo enc">SOB ENCOMENDA</span>` : off ? `<span class="selo">-${off}%</span>` : "";
   return `<div class="card" data-pid="${p.id}">
     <div class="foto" style="background:${p.cor||'#f5eee9'}">
       ${foto ? `<img src="${mini(foto)}" alt="${p.nome}" loading="lazy" data-foto-de="${p.id}" onerror="if(this.dataset.orig&&this.src!==this.dataset.orig)this.src=this.dataset.orig" data-orig="${foto}">` : (p.emoji||'🐾')}

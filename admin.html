@@ -307,7 +307,7 @@
 
     <label id="pPrazoBox" class="oculto">Prazo de produção deste produto<input id="pPrazo" placeholder="vazio = usa o prazo geral da aba Loja (ex.: 7 a 10 dias úteis)"></label>
     <div class="checks">
-      <label><input type="checkbox" id="pNovo"> Novidade</label>
+      <label title="Aparece no botão Lançamentos da loja, com o selo 🚀 LANÇAMENTO"><input type="checkbox" id="pNovo"> 🚀 Lançamento</label>
       <label><input type="checkbox" id="pDestaque"> Destaque</label>
       <label><input type="checkbox" id="pChav" checked> Aceita chaveiro</label>
       <label title="Produzido depois do pedido: não usa estoque e nunca aparece como esgotado"><input type="checkbox" id="pEnc"> 🛠️ Sob encomenda</label>
@@ -599,7 +599,7 @@ function renderTabela(){
   $("#tabela").innerHTML = lista.length ? lista.map(p => `
     <tr>
       <td>${p.foto ? `<img class="thumb" src="${esc(p.foto)}?v=${p.atualizado||""}" alt="">` : `<div class="thumb" style="background:${esc(p.cor||'#f5eee9')}">${esc(p.emoji||"🐾")}</div>`}</td>
-      <td><b>${esc(p.nome)}</b><small class="tipo-mob" style="display:none;color:var(--suave)">${(t => t ? `${esc(t.emoji||"")} ${esc(t.nome)}` : esc(p.tipo||""))(tiposLoja().find(t => t.id === p.tipo))}</small><br>${p.novo?'<span class="pill">NOVO</span>':''}${p.destaque?'<span class="pill" style="background:var(--cor)">DESTAQUE</span>':''}${p.encomenda?'<span class="pill" style="background:#ff8a00">SOB ENCOMENDA</span>':!+p.estoque?'<span class="pill esg">ESGOTADO</span>':''}</td>
+      <td><b>${esc(p.nome)}</b><small class="tipo-mob" style="display:none;color:var(--suave)">${(t => t ? `${esc(t.emoji||"")} ${esc(t.nome)}` : esc(p.tipo||""))(tiposLoja().find(t => t.id === p.tipo))}</small><br>${p.novo?'<span class="pill" style="background:#3b0f8c">🚀 LANÇAMENTO</span>':''}${p.destaque?'<span class="pill" style="background:var(--cor)">DESTAQUE</span>':''}${p.encomenda?'<span class="pill" style="background:#ff8a00">SOB ENCOMENDA</span>':!+p.estoque?'<span class="pill esg">ESGOTADO</span>':''}</td>
       <td class="col-tipo">${(t => t ? `${esc(t.emoji||"")} ${esc(t.nome)}` : esc(p.tipo||"—"))(tiposLoja().find(t => t.id === p.tipo))}</td>
       <td class="col-colecao">${esc(p.colecao||"")}</td>
       <td>${brl(p.preco)}${+p.de?`<br><s style="color:var(--suave);font-size:.8rem">${brl(p.de)}</s>`:""}</td>
