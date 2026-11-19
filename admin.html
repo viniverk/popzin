@@ -55,6 +55,9 @@
   .lanc-chk{display:inline-flex;align-items:center;gap:4px;cursor:pointer;margin:0;font-weight:700}
   .lanc-chk input{width:20px;height:20px;accent-color:#3b0f8c;cursor:pointer}
   .lanc-chk input:not(:checked)+span{filter:grayscale(1);opacity:.35}
+  .col-ativo{text-align:center}
+  .ativo-chk input{accent-color:#2e9e5b}
+  tr.inativo td:not(.col-ativo){opacity:.45}
   .pill.esg{background:#9a8f8a}
 
   .modal-veu{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:flex-start;justify-content:center;padding:4vh 12px;overflow:auto;z-index:30}
@@ -166,7 +169,7 @@
       <div class="ajuda" id="avisoTempo" style="margin-bottom:10px">Depois de salvar, o site leva cerca de 1 minuto para atualizar no GitHub Pages.</div>
       <div id="importar" class="cartao oculto" style="margin-bottom:14px;max-width:none"></div>
       <table>
-        <thead><tr><th></th><th>Produto</th><th class="col-tipo">Tipo</th><th class="col-colecao">Coleção</th><th>Preço</th><th class="col-estoque">Estoque</th><th class="col-lanc" title="Marque para o produto aparecer no botão Lançamentos da loja">🚀<span class="so-pc"> Lançamento</span></th><th></th></tr></thead>
+        <thead><tr><th></th><th>Produto</th><th class="col-tipo">Tipo</th><th class="col-colecao">Coleção</th><th>Preço</th><th class="col-estoque">Estoque</th><th class="col-ativo" title="Desmarque para esconder o produto da loja sem excluir">👁️<span class="so-pc"> No site</span></th><th class="col-lanc" title="Marque para o produto aparecer no botão Lançamentos da loja">🚀<span class="so-pc"> Lançamento</span></th><th></th></tr></thead>
         <tbody id="tabela"></tbody>
       </table>
     </section>
@@ -578,7 +581,7 @@ $("#btnSair").onclick = async () => {
 async function entrarNoPainel(){
   mostrar("#telaPainel");
   if(modoFB) iniciarVigia();
-  $("#tabela").innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--suave);padding:30px">Carregando...</td></tr>`;
+  $("#tabela").innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--suave);padding:30px">Carregando...</td></tr>`;
   try{
     produtos = await BD.lerProdutos();
     loja = (await BD.lerLoja()) || {...PADRAO_LOJA};
@@ -605,30 +608,33 @@ function renderTabela(){
   const f = $("#filtro").value.toLowerCase();
   const lista = produtos.filter(p => !f || (p.nome+" "+(p.colecao||"")+" "+(tiposLoja().find(t => t.id === p.tipo)?.nome||p.tipo||"")).toLowerCase().includes(f));
   $("#tabela").innerHTML = lista.length ? lista.map(p => `
-    <tr>
+    <tr class="${p.ativo === false ? "inativo" : ""}">
       <td>${p.foto ? `<img class="thumb" src="${esc(p.foto)}?v=${p.atualizado||""}" alt="">` : `<div class="thumb" style="background:${esc(p.cor||'#f5eee9')}">${esc(p.emoji||"🐾")}</div>`}</td>
-      <td><b>${esc(p.nome)}</b><small class="tipo-mob" style="display:none;color:var(--suave)">${(t => t ? `${esc(t.emoji||"")} ${esc(t.nome)}` : esc(p.tipo||""))(tiposLoja().find(t => t.id === p.tipo))}</small><br>${p.novo?'<span class="pill" style="background:#3b0f8c">🚀 LANÇAMENTO</span>':''}${p.destaque?'<span class="pill" style="background:var(--cor)">DESTAQUE</span>':''}${p.encomenda?'<span class="pill" style="background:#ff8a00">SOB ENCOMENDA</span>':!+p.estoque?'<span class="pill esg">ESGOTADO</span>':''}</td>
+      <td><b>${esc(p.nome)}</b><small class="tipo-mob" style="display:none;color:var(--suave)">${(t => t ? `${esc(t.emoji||"")} ${esc(t.nome)}` : esc(p.tipo||""))(tiposLoja().find(t => t.id === p.tipo))}</small><br>${p.novo?'<span class="pill" style="background:#3b0f8c">🚀 LANÇAMENTO</span>':''}${p.destaque?'<span class="pill" style="background:var(--cor)">DESTAQUE</span>':''}${p.ativo===false?'<span class="pill" style="background:#6b6478">🙈 FORA DO SITE</span>':''}${p.encomenda?'<span class="pill" style="background:#ff8a00">SOB ENCOMENDA</span>':!+p.estoque?'<span class="pill esg">ESGOTADO</span>':''}</td>
       <td class="col-tipo">${(t => t ? `${esc(t.emoji||"")} ${esc(t.nome)}` : esc(p.tipo||"—"))(tiposLoja().find(t => t.id === p.tipo))}</td>
       <td class="col-colecao">${esc(p.colecao||"")}</td>
       <td>${brl(p.preco)}${+p.de?`<br><s style="color:var(--suave);font-size:.8rem">${brl(p.de)}</s>`:""}</td>
       <td class="col-estoque">${p.encomenda ? `<span style="color:#b35c00;font-weight:700">🛠️ Encomenda</span>` : +p.estoque||0}${!p.encomenda && (p.cores||[]).length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${p.cores.map(c => `<span title="${esc(c.nome)}" style="display:inline-flex;align-items:center;gap:3px;font-size:.72rem;color:${(c.esgotado||+c.estoque===0)?"#c62828":"var(--suave)"}"><i style="width:10px;height:10px;border-radius:50%;background:${esc(c.hex||"#ccc")};display:inline-block;box-shadow:0 0 0 1px #ddd"></i>${c.esgotado ? 0 : (c.estoque ?? "?")}</span>`).join("")}</div>` : ""}</td>
+      <td class="col-ativo"><label class="lanc-chk ativo-chk" title="${p.ativo === false ? "Escondido da loja" : "Aparece na loja"}"><input type="checkbox" data-ativo="${p.id}" ${p.ativo === false ? "" : "checked"} aria-label="Mostrar no site: ${esc(p.nome)}"></label></td>
       <td class="col-lanc"><label class="lanc-chk" title="Aparece no botão Lançamentos da loja"><input type="checkbox" data-lanc="${p.id}" ${p.novo ? "checked" : ""} aria-label="Lançamento: ${esc(p.nome)}"><span>🚀</span></label></td>
       <td><div class="acoes"><button class="btn sec" data-editar="${p.id}">Editar</button></div></td>
-    </tr>`).join("") : `<tr><td colspan="8" style="text-align:center;color:var(--suave);padding:30px">Nenhum produto ainda. Clique em “+ Novo produto”.</td></tr>`;
+    </tr>`).join("") : `<tr><td colspan="9" style="text-align:center;color:var(--suave);padding:30px">Nenhum produto ainda. Clique em “+ Novo produto”.</td></tr>`;
 
 }
 $("#filtro").oninput = renderTabela;
 /* marcar/desmarcar lançamento direto na lista (salva na hora) */
 $("#tabela").addEventListener("change", async e => {
-  const cb = e.target.closest("[data-lanc]"); if(!cb) return;
-  const p = produtos.find(x => x.id == cb.dataset.lanc); if(!p) return;
+  const cb = e.target.closest("[data-lanc],[data-ativo]"); if(!cb) return;
+  const ehAtivo = cb.dataset.ativo !== undefined;
+  const p = produtos.find(x => x.id == (ehAtivo ? cb.dataset.ativo : cb.dataset.lanc)); if(!p) return;
   cb.disabled = true;
   try{
-    const novo = {...p, novo: cb.checked, atualizado: Date.now()};
+    const novo = {...p, ...(ehAtivo ? {ativo: cb.checked} : {novo: cb.checked}), atualizado: Date.now()};
     await BD.salvarProduto(novo);
     Object.assign(p, novo);
     renderTabela();
-    toast(cb.checked ? `🚀 ${p.nome} agora está em Lançamentos` : `${p.nome} saiu de Lançamentos`);
+    toast(ehAtivo ? (cb.checked ? `👁️ ${p.nome} voltou para a loja` : `🙈 ${p.nome} foi escondido da loja (não foi excluído)`)
+                  : (cb.checked ? `🚀 ${p.nome} agora está em Lançamentos` : `${p.nome} saiu de Lançamentos`));
   }catch(err){ cb.checked = !cb.checked; cb.disabled = false; toast(err.message, true); }
 });
 $("#tabela").onclick = e => { const b = e.target.closest("[data-editar]"); if(b) abrirModal(produtos.find(p=>p.id==b.dataset.editar)); };

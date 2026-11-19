@@ -494,6 +494,7 @@ async function iniciar(){
     try { CONFIG = {...CONFIG, ...(await carregarJSON("loja.json"))}; } catch(e){}
     try { const p = await carregarJSON("produtos.json"); if(Array.isArray(p)) PRODUTOS = p; } catch(e){}
   }
+  PRODUTOS = PRODUTOS.filter(p => p.ativo !== false);               // desativados no painel não aparecem
   PRODUTOS.forEach(p => { p.preco=+p.preco||0; p.de=+p.de||0; p.estoque=+p.estoque||0; p.vendidos=+p.vendidos||0; p.encomenda=!!p.encomenda;
     if(p.encomenda) (p.cores||[]).forEach(c => c._enc = true); });
   carrinho = Object.fromEntries(Object.entries(carrinho).filter(([k]) => { const {id, cor} = lerChave(k), p = PRODUTOS.find(x => x.id === id);

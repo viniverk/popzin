@@ -188,6 +188,7 @@ function calcular(itensPedidos, produtos, cfg, uf) {
     if (q < 1 || q > 50) throw erroPublico("Quantidade inválida.");
     const p = produtos.find(x => +x.id === +it.id);
     if (!p) throw erroPublico("Um produto do carrinho não existe mais. Atualize a página.");
+    if (p.ativo === false) throw erroPublico(`${p.nome} não está mais disponível. Atualize a página.`);
     const total = porProduto[+p.id];
     const enc = !!p.encomenda;                                   // sob encomenda: produzido depois do pedido, sem estoque
     if (!enc && total > (+p.estoque || 0)) throw erroPublico(`Estoque insuficiente de ${p.nome} (disponível: ${+p.estoque || 0}).`);
