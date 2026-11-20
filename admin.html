@@ -242,7 +242,7 @@
     <h3>🏷️ Tipos e coleções</h3>
     <div>
       <label style="margin-bottom:4px">Tipos (viram as abas da loja)</label>
-      <div class="ajuda" style="margin-bottom:8px">Renomeie, troque o emoji ou remova. Um tipo com produtos só pode ser removido escolhendo para onde eles vão.</div>
+      <div class="ajuda" style="margin-bottom:8px">Use ▲ ▼ para mudar a ordem das abas na loja (de cima para baixo = da esquerda para a direita). Renomeie, troque o emoji ou remova. Um tipo com produtos só pode ser removido escolhendo para onde eles vão.</div>
       <div id="tcTipos" style="display:grid;gap:8px"></div>
       <button class="btn sec" type="button" id="tcAddTipo" style="margin-top:8px">+ novo tipo</button>
     </div>
@@ -1088,10 +1088,11 @@ function desenharTC(){
   $("#tcTipos").innerHTML = tcTipos.map((t,i) => {
     const n = t.orig ? produtos.filter(p => p.tipo === t.orig).length : 0;
     if(t.del) return `<div class="fretes-linha" style="grid-template-columns:1fr auto;opacity:.75"><small style="align-self:center">🗑️ <s>${esc(t.emoji)} ${esc(t.nome)}</s>${n ? ` — ${n} produto(s) vão para <select data-tpara="${i}" style="padding:4px;width:auto;display:inline-block">${vivos.filter(v => v.orig).map(v => `<option value="${esc(v.orig)}" ${t.para===v.orig?"selected":""}>${esc(v.emoji)} ${esc(v.nome)}</option>`).join("")}</select>` : ""}</small><button class="btn sec" type="button" data-tvolta="${i}">Desfazer</button></div>`;
-    return `<div class="fretes-linha" style="grid-template-columns:58px 1fr 92px 40px">
+    return `<div class="fretes-linha" style="grid-template-columns:58px 1fr 92px 76px 40px">
       <input data-temoji="${i}" value="${esc(t.emoji||"")}" maxlength="4" style="text-align:center" aria-label="Emoji">
       <input data-tnome="${i}" value="${esc(t.nome)}" placeholder="Nome do tipo" aria-label="Nome do tipo">
       <small style="align-self:center;color:var(--suave)">${n} produto(s)</small>
+      <div style="display:flex;gap:4px"><button class="btn sec" type="button" data-tsobe="${i}" title="Mover para a esquerda na loja" aria-label="Subir" style="padding:6px 10px" ${i===0?"disabled":""}>▲</button><button class="btn sec" type="button" data-tdesce="${i}" title="Mover para a direita na loja" aria-label="Descer" style="padding:6px 10px" ${i===tcTipos.length-1?"disabled":""}>▼</button></div>
       <button class="btn sec" type="button" data-tdel="${i}" title="Remover">✕</button></div>`; }).join("");
   $("#tcCols").innerHTML = tcCols.length ? tcCols.map((c,i) => {
     const n = produtos.filter(p => p.colecao === c.orig).length;
@@ -1112,6 +1113,10 @@ $("#modalTC").addEventListener("click", e => {
     if(tcTipos.filter(x => !x.del).length <= 1) return toast("Deixe pelo menos um tipo.", true);
     if(!t.orig) tcTipos.splice(+b.dataset.tdel, 1); else { t.del = true; t.para = (tcTipos.find(x => !x.del && x !== t)?.orig) || tcTipos.find(x => !x.del && x !== t)?.id || ""; }
     desenharTC(); }
+  if(b.dataset.tsobe !== undefined || b.dataset.tdesce !== undefined){ lerTC();
+    const i = +(b.dataset.tsobe ?? b.dataset.tdesce), j = b.dataset.tsobe !== undefined ? i - 1 : i + 1;
+    if(j >= 0 && j < tcTipos.length){ [tcTipos[i], tcTipos[j]] = [tcTipos[j], tcTipos[i]]; desenharTC(); document.querySelector(`[data-${b.dataset.tsobe !== undefined ? "tsobe" : "tdesce"}="${j}"]`)?.focus(); }
+    return; }
   if(b.dataset.tvolta !== undefined){ lerTC(); tcTipos[+b.dataset.tvolta].del = false; desenharTC(); }
   if(b.dataset.cdel !== undefined){ lerTC(); tcCols[+b.dataset.cdel].del = true; desenharTC(); }
   if(b.dataset.cvolta !== undefined){ lerTC(); tcCols[+b.dataset.cvolta].del = false; desenharTC(); }
