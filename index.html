@@ -62,6 +62,23 @@
   .atalhos a:hover{border-color:var(--cor);color:var(--cor)}
   .tag-breve{background:var(--amarelo);color:var(--navy)!important;color:#fff;font-size:.65rem;border-radius:6px;padding:1px 5px;margin-left:4px}
 
+  .carrossel{max-width:1200px;margin:24px auto 8px;position:relative;border-radius:28px;overflow:hidden}
+  .car-trilho{display:flex;transition:transform .55s cubic-bezier(.4,.1,.2,1)}
+  .car-slide{flex:0 0 100%;min-width:0}
+  .carrossel .hero{margin:0;border-radius:0;min-height:100%;padding-bottom:40px}
+  .car-arte{display:block;flex:0 0 100%;background:#07081d}
+  .car-arte{display:flex!important;align-items:center;justify-content:center}
+  .car-arte img{display:block;width:100%;height:100%;max-height:420px;object-fit:cover}
+  .car-arte picture{display:block;width:100%;height:100%}
+  @media (max-width:640px){.car-arte img{object-fit:contain;height:auto}.car-arte.tem-cel img{object-fit:cover;height:100%;max-height:none}}
+  .car-seta{position:absolute;top:50%;transform:translateY(-50%);z-index:3;width:42px;height:42px;border-radius:50%;border:0;background:rgba(255,255,255,.92);color:#1a0b3d;font-size:1.7rem;font-weight:800;line-height:1;padding-bottom:4px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+  .car-ant{left:12px}.car-prox{right:12px}
+  .car-seta:hover{background:var(--amarelo)}
+  .car-pontos{position:absolute;bottom:12px;left:0;right:0;display:flex;justify-content:center;gap:7px;z-index:3}
+  .car-pontos button{width:9px;height:9px;border-radius:999px;border:0;padding:0;background:rgba(255,255,255,.45);cursor:pointer;transition:width .3s}
+  .car-pontos button.on{width:26px;background:var(--amarelo)}
+  @media (max-width:640px){.carrossel{margin:14px 12px 6px;border-radius:20px}.car-seta{width:32px;height:32px;font-size:1.3rem}.car-ant{left:6px}.car-prox{right:6px}}
+  @media (prefers-reduced-motion:reduce){.car-trilho{transition:none}}
   .hero{max-width:1200px;margin:24px auto 8px;padding:26px 34px;border-radius:28px;background:radial-gradient(circle at 85% 40%,#1c1a5a 0%,#07081d 45%,#05061a 100%);color:#fff;display:flex;align-items:center;gap:28px;overflow:hidden;position:relative}
   .hero img{width:min(300px,38vw);height:auto;flex-shrink:0;border-radius:24px;box-shadow:0 0 0 1px rgba(123,47,247,.35),0 12px 40px rgba(123,47,247,.35)}
   .hero h1{font-size:clamp(1.7rem,4vw,2.8rem);line-height:1.1}
@@ -272,13 +289,20 @@
 </header>
 
 <div class="wrap">
-  <div class="hero">
-    <img src="img/marca/logo-mascote.webp" alt="PopZin — Seu mundo em miniatura">
-    <div>
-      <h1>Seu mundo em <em>miniatura</em></h1>
-      <p>Bichinhos articulados e colecionáveis impressos em 3D. Feitos um a um, com carinho, para colecionar ou presentear.</p>
-      <a class="cta" href="#catalogo">Ver catálogo 👇</a>
+  <div class="carrossel" id="carrossel" aria-roledescription="carrossel" aria-label="Destaques da PopZin">
+    <div class="car-trilho" id="carTrilho">
+      <div class="hero car-slide" aria-roledescription="slide">
+        <img src="img/marca/logo-mascote.webp" alt="PopZin — Seu mundo em miniatura">
+        <div>
+          <h1>Seu mundo em <em>miniatura</em></h1>
+          <p>Bichinhos articulados e colecionáveis impressos em 3D. Feitos um a um, com carinho, para colecionar ou presentear.</p>
+          <a class="cta" href="#catalogo">Ver catálogo 👇</a>
+        </div>
+      </div>
     </div>
+    <button type="button" class="car-seta car-ant" id="carAnt" aria-label="Banner anterior" hidden>‹</button>
+    <button type="button" class="car-seta car-prox" id="carProx" aria-label="Próximo banner" hidden>›</button>
+    <div class="car-pontos" id="carPontos"></div>
   </div>
 
   <div class="controles" id="catalogo">
@@ -501,9 +525,61 @@ async function iniciar(){
     if(!p) return false; const cs = coresDe(p); return cs.length ? cs.some(c => c.id === cor && !semCor(c)) : !cor; }));
   if(!CONFIG.fretes[regiao]) regiao = Object.keys(CONFIG.fretes)[0];
   montarTela();
+  montarCarrossel();
   render();
   registrarVisita();
 }
+
+/* ---------- carrossel de banners ---------- */
+let carIdx = 0, carTimer = null, carN = 1;
+function linkBanner(l){
+  if(!l || l === "#catalogo") return {href:"#catalogo"};
+  if(l === "wa") return CONFIG.whatsapp ? {href: wa("Olá! Vi o banner no site da PopZin 😊"), ext:true} : {href:"#catalogo"};
+  if(l.startsWith("#tipo=")) return {href:"#catalogo", tipo: l.slice(6)};
+  return /^https?:\/\//.test(l) ? {href:l, ext:true} : {href:"#catalogo"};
+}
+function montarCarrossel(){
+  const bs = (Array.isArray(CONFIG.banners) ? CONFIG.banners : []).filter(b => b && b.ativo !== false && (b.imagem || b.titulo));
+  const trilho = $("#carTrilho");
+  trilho.querySelectorAll(".car-extra").forEach(x => x.remove());
+  bs.forEach((b,i) => {
+    const L = linkBanner(b.link), alvo = `href="${escH(L.href)}"${L.ext ? ' target="_blank" rel="noopener"' : ""}${L.tipo ? ` data-irtipo="${escH(L.tipo)}"` : ""}`;
+    const img = b.imagem ? escH(b.imagem) : "";
+    trilho.insertAdjacentHTML("beforeend", b.titulo
+      ? `<div class="hero car-slide car-extra" aria-roledescription="slide">${img ? `<img src="${img}" alt="${escH(b.titulo)}" loading="lazy">` : ""}
+          <div><h2 style="font-size:clamp(1.5rem,3.6vw,2.5rem);line-height:1.1">${escH(b.titulo)}</h2>${b.texto ? `<p>${escH(b.texto)}</p>` : ""}
+          <a class="cta" ${alvo}>${escH(b.botao || "Ver agora")} →</a></div></div>`
+      : `<a class="car-slide car-arte car-extra${b.imagemCel ? " tem-cel" : ""}" ${alvo} aria-roledescription="slide" aria-label="Banner ${i+2}"><picture>${b.imagemCel ? `<source media="(max-width:640px)" srcset="${escH(b.imagemCel)}">` : ""}<img src="${img || escH(b.imagemCel||"")}" alt="Banner PopZin" loading="lazy"></picture></a>`);
+  });
+  carN = trilho.children.length;
+  const multi = carN > 1;
+  $("#carAnt").hidden = $("#carProx").hidden = !multi;
+  $("#carPontos").innerHTML = multi ? Array.from({length:carN}, (_,i) => `<button type="button" aria-label="Ir para o banner ${i+1}" data-car="${i}"></button>`).join("") : "";
+  irCarrossel(0, true);
+}
+function irCarrossel(i, semReiniciar){
+  carIdx = (i + carN) % carN;
+  $("#carTrilho").style.transform = `translateX(-${carIdx*100}%)`;
+  [...$("#carTrilho").children].forEach((s,k) => { s.setAttribute("aria-hidden", k !== carIdx); s.querySelectorAll("a,button").forEach(x => x.tabIndex = k === carIdx ? 0 : -1); });
+  $("#carPontos").querySelectorAll("button").forEach((b,k) => b.classList.toggle("on", k === carIdx));
+  if(!semReiniciar || !carTimer) autoCarrossel();
+}
+function autoCarrossel(){ clearInterval(carTimer); if(carN > 1 && !matchMedia("(prefers-reduced-motion: reduce)").matches) carTimer = setInterval(() => irCarrossel(carIdx + 1, true), 6000); }
+$("#carAnt").onclick = () => irCarrossel(carIdx - 1);
+$("#carProx").onclick = () => irCarrossel(carIdx + 1);
+$("#carPontos").onclick = e => { const b = e.target.closest("[data-car]"); if(b) irCarrossel(+b.dataset.car); };
+$("#carrossel").addEventListener("mouseenter", () => clearInterval(carTimer));
+$("#carrossel").addEventListener("mouseleave", autoCarrossel);
+$("#carrossel").addEventListener("focusin", () => clearInterval(carTimer));
+let carToque = null;
+$("#carrossel").addEventListener("touchstart", e => { carToque = e.touches[0].clientX; clearInterval(carTimer); }, {passive:true});
+$("#carrossel").addEventListener("touchend", e => { if(carToque === null) return; const dx = e.changedTouches[0].clientX - carToque; carToque = null;
+  if(Math.abs(dx) > 40) irCarrossel(carIdx + (dx < 0 ? 1 : -1)); else autoCarrossel(); }, {passive:true});
+$("#carrossel").addEventListener("click", e => {
+  const a = e.target.closest("[data-irtipo]"); if(!a) return;
+  estado.tipo = a.dataset.irtipo; montarFiltros(); render();
+});
+document.addEventListener("visibilitychange", () => document.hidden ? clearInterval(carTimer) : autoCarrossel());
 
 function montarTela(){
 /* faixa do topo: usa o texto do painel; se estiver vazio, monta a partir do frete */
