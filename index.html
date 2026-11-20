@@ -145,6 +145,9 @@
   .selo.enc{background:#ff8a00}
   .selo.novo{background:linear-gradient(135deg,#1a0b3d,#7b2ff7);box-shadow:0 0 0 2px #ffcf3d}
   .enc-info{font-size:.78rem;color:#8a4b00;background:#fff3e0;border-radius:10px;padding:6px 8px;margin:6px 0 2px;line-height:1.3}
+  .desc{font-size:.82rem;color:var(--suave);line-height:1.4;margin-top:4px;white-space:pre-line;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .desc.aberta{-webkit-line-clamp:unset;display:block}
+  .desc-mais{background:none;padding:0;margin-top:2px;color:var(--cor);font-weight:700;font-size:.78rem;align-self:flex-start}
   .cores{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 2px}
   .cor-bola{width:22px;height:22px;border-radius:50%;background:var(--c);border:2px solid #fff;box-shadow:0 0 0 1px var(--borda);padding:0;cursor:pointer;position:relative}
   .cor-bola.on{box-shadow:0 0 0 2px var(--cor)}
@@ -646,6 +649,7 @@ function render(){
   const disp = p => p.encomenda || p.estoque > 0 ? 0 : 1;
   lista.sort((a,b)=>(b.novo?1:0)-(a.novo?1:0) || disp(a)-disp(b) || ord(a,b));
 
+  requestAnimationFrame(() => document.querySelectorAll("#grade [data-desc]").forEach(d => { const b = d.nextElementSibling; if(b) b.hidden = d.scrollHeight <= d.clientHeight + 2; }));
   $("#contagem").textContent = estado.soFavs ? `🤍 Seus favoritos: ${lista.length}` : `${lista.length} bichinho(s)`;
   $("#grade").innerHTML = lista.length ? lista.map(card).join("") :
     `<div class="vazio">${estado.soFavs ? "Você ainda não favoritou nenhum bichinho 🤍" : "Nenhum bichinho encontrado com esses filtros 🐾"}
@@ -703,6 +707,7 @@ function card(p){
     <div class="info">
       <div class="colecao">${p.colecao}</div>
       <div class="nome">${p.nome}</div>
+      ${p.descricao ? `<div class="desc" data-desc="${p.id}">${escH(p.descricao)}</div><button type="button" class="desc-mais" data-descmais="${p.id}" hidden>ver mais</button>` : ""}
       ${cs.length ? `<div class="cores" role="radiogroup" aria-label="Cor">${cs.map(c => `<button type="button" class="cor-bola${c.id===cAtual?" on":""}${semCor(c)?" esg":""}" data-cor="${p.id}:${c.id}" title="${escH(c.nome)}${semCor(c)?" (esgotada)":""}" aria-label="${escH(c.nome)}" style="--c:${escH(c.hex||"#ccc")}" ${semCor(c)?"disabled":""}></button>`).join("")}<span class="cor-nome" data-cor-nome="${p.id}">${escH(corDe(p,cAtual)?.nome||"")}</span></div>` : ""}
       <div class="precos">
         ${p.de?`<span class="de">${brl(p.de)}</span>`:""}<span class="preco">${brl(p.preco)}</span>
@@ -727,6 +732,8 @@ $("#grade").addEventListener("touchend", e => {
   const p = PRODUTOS.find(x => x.id === +cardEl.dataset.pid); if(p) mostrarFotoGal(cardEl, p, (+cardEl.dataset.gi || 0) + (dx < 0 ? 1 : -1));
 }, {passive:true});
 $("#grade").onclick = e => {
+  const dm = e.target.closest("[data-descmais]");
+  if(dm){ const d = dm.parentNode.querySelector(`[data-desc="${dm.dataset.descmais}"]`); const ab = d.classList.toggle("aberta"); dm.textContent = ab ? "ver menos" : "ver mais"; return; }
   const gs = e.target.closest("[data-gal]");
   if(gs){ const cardEl = gs.closest(".card"), p = PRODUTOS.find(x => x.id === +cardEl.dataset.pid);
     if(p) mostrarFotoGal(cardEl, p, (+cardEl.dataset.gi || 0) + (+gs.dataset.gal)); return; }

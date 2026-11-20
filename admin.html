@@ -293,6 +293,9 @@
     </div>
     <div class="grid2">
       <label style="grid-column:1/-1">Nome<input id="pNome" required></label>
+      <label style="grid-column:1/-1">Descrição <small style="font-weight:400;color:var(--suave)">(opcional — tamanho, material, articulações, cuidados…)</small>
+        <textarea id="pDesc" rows="3" maxlength="600" placeholder="Ex.: Godzilla flexível impresso em PLA, 12 cm, todas as partes articuladas. Ótimo para brincar e colecionar." style="resize:vertical;font-family:inherit;padding:10px;border:1px solid var(--borda);border-radius:12px"></textarea>
+        <small id="pDescConta" style="text-align:right;color:var(--suave);font-weight:400">0/600</small></label>
       <label>Tipo
         <select id="pTipo"></select>
       </label>
@@ -656,7 +659,7 @@ function abrirModal(p){
   editando = p; novaFoto = null; removerFoto = false;
   $("#mTitulo").textContent = p ? "Editar produto" : "Novo produto";
   $("#btnExcluir").classList.toggle("oculto", !p);
-  $("#pNome").value = p?.nome || ""; montarSelTipo(p?.tipo || tiposLoja()[0]?.id); montarSelColecao(p?.colecao || "");
+  $("#pNome").value = p?.nome || ""; $("#pDesc").value = p?.descricao || ""; $("#pDescConta").textContent = `${$("#pDesc").value.length}/600`; montarSelTipo(p?.tipo || tiposLoja()[0]?.id); montarSelColecao(p?.colecao || "");
   $("#pPreco").value = p?.preco ?? ""; $("#pDe").value = p?.de || ""; $("#pEstoque").value = p?.estoque ?? 0;
   $("#pVendidos").value = p?.vendidos ?? 0; $("#pPromoQtd").value = p?.promoQtd || ""; $("#pPromoPreco").value = p?.promoPreco || ""; $("#pEmoji").value = p?.emoji || ""; $("#pCor").value = p?.cor || "#f1ebff";
   $("#pChav").checked = !p?.semChaveiro; $("#pNovo").checked = !!p?.novo; $("#pDestaque").checked = !!p?.destaque; $("#pFoto").value = ""; $("#pFotoUrl").value = p?.foto || "";
@@ -703,6 +706,8 @@ function modoEncomenda(){
   document.querySelectorAll("#pCores .c-est").forEach(i => { i.disabled = on; i.placeholder = on ? "—" : "Estoque"; });
 }
 $("#pEnc").onchange = modoEncomenda;
+
+$("#pDesc").addEventListener("input", e => $("#pDescConta").textContent = `${e.target.value.length}/600`);
 
 function montarCores(p){ $("#pCores").innerHTML = ""; (p?.cores || []).forEach(linhaCor); somaEstoqueCores(); }
 /* com cores, o estoque do produto é a soma das cores (campo fica travado) */
@@ -772,7 +777,7 @@ $("#formProduto").onsubmit = async e => {
   try{
     const id = editando ? editando.id : (Math.max(0, ...produtos.map(p=>+p.id||0)) + 1);
     const p = {
-      id, nome:$("#pNome").value.trim(), tipo:$("#pTipo").value, colecao:colecaoEscolhida(),
+      id, nome:$("#pNome").value.trim(), descricao:$("#pDesc").value.trim(), tipo:$("#pTipo").value, colecao:colecaoEscolhida(),
       preco:+$("#pPreco").value||0, de:+$("#pDe").value||0, estoque:+$("#pEstoque").value||0, vendidos:+$("#pVendidos").value||0, promoQtd:Math.floor(+$("#pPromoQtd").value||0), promoPreco:+$("#pPromoPreco").value||0,
       emoji:$("#pEmoji").value.trim(), cor:$("#pCor").value, novo:$("#pNovo").checked, destaque:$("#pDestaque").checked, semChaveiro:!$("#pChav").checked,
       encomenda:$("#pEnc").checked, prazo:$("#pEnc").checked ? $("#pPrazo").value.trim() : "",
