@@ -452,7 +452,7 @@ const FS = `https://firestore.googleapis.com/v1/projects/${FB.projectId}/databas
 let fbSessao = null;   // {idToken, refreshToken, expires_at, email}
 const lerSessaoFB = () => { try{ return JSON.parse(localStorage.getItem("popzin_fb")) }catch(e){ return null } };
 const gravarSessaoFB = s => { fbSessao = s; try{ s ? localStorage.setItem("popzin_fb", JSON.stringify(s)) : localStorage.removeItem("popzin_fb"); }catch(e){} };
-const ERROS_FB = {INVALID_LOGIN_CREDENTIALS:"E-mail ou senha incorretos.", INVALID_PASSWORD:"E-mail ou senha incorretos.", EMAIL_NOT_FOUND:"E-mail ou senha incorretos.",
+const ERROS_FB = {INVALID_LOGIN_CREDENTIALS:"Usuário ou senha incorretos.", INVALID_PASSWORD:"Usuário ou senha incorretos.", EMAIL_NOT_FOUND:"Usuário ou senha incorretos.",
   USER_DISABLED:"Usuário desativado.", TOO_MANY_ATTEMPTS_TRY_LATER:"Muitas tentativas. Espere alguns minutos."};
 async function fbLogin(email, senha){
   const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FB.apiKey}`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({email, password:senha, returnSecureToken:true})});
@@ -529,7 +529,7 @@ async function iniciar(){
       `<div class="msg">⚠️ Conexão sem cadeado (http). O painel funciona, mas use só em rede confiável até o HTTPS do domínio ficar pronto. <a href="https://${location.host}${location.pathname}">Tentar https</a></div>`));
   }
   if(modoFB){
-    $("#lUserLbl").textContent = "E-mail"; $("#lUser").type = "email"; $("#lUser").autocomplete = "email";
+    $("#lUserLbl").textContent = "Usuário"; $("#lUser").type = "text"; $("#lUser").autocomplete = "username"; $("#lUser").autocapitalize = "none";
     $("#avisoTempo").textContent = "As alterações aparecem no site na hora (é só atualizar a página da loja).";
     $("#fotoArquivo").classList.add("oculto"); $("#fotoLink").classList.remove("oculto");
     $("#abaBtnVendas").classList.remove("oculto");
@@ -576,7 +576,9 @@ $("#telaLogin").onsubmit = async e => {
   const el = $("#lMsg"), b = $("#btnLogin");
   b.disabled = true; msg(el,"Entrando...",true);
   if(modoFB){
-    try{ await fbLogin($("#lUser").value.trim(), $("#lPass").value); }
+    // "admin" vira admin@popzin.com.br; quem digitar um e-mail completo também entra
+    const u = $("#lUser").value.trim().toLowerCase(), login = u.includes("@") ? u : `${u}@popzin.com.br`;
+    try{ await fbLogin(login, $("#lPass").value); }
     catch(err){ b.disabled=false; return msg(el, err.message); }
     b.disabled = false; $("#lPass").value = ""; return entrarNoPainel();
   }
